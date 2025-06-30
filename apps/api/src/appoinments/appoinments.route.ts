@@ -118,6 +118,32 @@ appointmentsRouter.put('/:id/status', authMiddleware, staffOrAdminMiddleware, as
     }
 });
 
+// Get appointments for the current authenticated user
+appointmentsRouter.get('/user/me', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { data, error } = await getUserAppointments(user.id);
+
+        if (error) {
+            return c.json(errorResponse(500, error), 500);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'No appointments found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error fetching user appointments:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
 // Get appointments for a specific user
 appointmentsRouter.get('/user/:userId', authMiddleware, async (c: Context) => {
     try {

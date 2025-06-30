@@ -8,6 +8,32 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth.middleware.j
 
 const usersRouter = new Hono();
 
+// Get current user profile
+usersRouter.get('/profile', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { data, error } = await getUserById(user.id);
+
+        if (error) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        return c.json(errorResponse(500, 'Failed to fetch user profile'), 500);
+    }
+});
+
 // Get all users
 usersRouter.get('/all', authMiddleware, adminMiddleware, async (c: Context) => {
     try {

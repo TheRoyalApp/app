@@ -16,7 +16,9 @@ import { useAuth } from '@/components/auth/AuthContext';
 import Colors from '@/constants/Colors';
 
 export default function SignUpScreen() {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,7 +27,7 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   const handleSignUp = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!firstName || !lastName || !phone || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
@@ -40,9 +42,16 @@ export default function SignUpScreen() {
       return;
     }
 
+    // Validar formato de teléfono básico
+    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{7,15}$/;
+    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+      Alert.alert('Error', 'Por favor ingresa un número de teléfono válido');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const success = await signUp(email, password, name);
+      const success = await signUp(email, password, firstName, lastName, phone);
       if (success) {
         router.replace('/(tabs)');
       } else {
@@ -87,14 +96,40 @@ export default function SignUpScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Nombre completo</Text>
+                <Text style={styles.label}>Nombre</Text>
                 <TextInput
                   style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Tu nombre completo"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  placeholder="Tu nombre"
                   placeholderTextColor={Colors.dark.textLight}
                   autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Apellido</Text>
+                <TextInput
+                  style={styles.input}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  placeholder="Tu apellido"
+                  placeholderTextColor={Colors.dark.textLight}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Teléfono</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="+1234567890"
+                  placeholderTextColor={Colors.dark.textLight}
+                  keyboardType="phone-pad"
                   autoCorrect={false}
                 />
               </View>
@@ -189,7 +224,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 32,
     paddingTop: 60
   },
   title: {
@@ -207,7 +242,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -244,7 +279,7 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 20,
   },
   dividerLine: {
     flex: 1,

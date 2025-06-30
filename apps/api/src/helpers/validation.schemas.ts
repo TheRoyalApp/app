@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Base schemas
 export const emailSchema = z.string().email('Invalid email format');
 export const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
-export const phoneSchema = z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format');
+export const phoneSchema = z.string().regex(/^\+?[\d\s\-\(\)]{7,20}$/, 'Invalid phone number format');
 
 // User schemas
 export const createUserSchema = z.object({

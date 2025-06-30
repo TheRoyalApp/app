@@ -1,0 +1,202 @@
+import { apiClient, ApiResponse } from './api';
+
+// Types
+export interface Appointment {
+  id: string;
+  userId: string;
+  barberId: string;
+  serviceId: string;
+  appointmentDate: string;
+  timeSlot: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  barber?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  service?: {
+    id: string;
+    name: string;
+    price: number;
+    duration: number;
+  };
+}
+
+export interface CreateAppointmentData {
+  userId: string;
+  barberId: string;
+  serviceId: string;
+  appointmentDate: string;
+  timeSlot: string;
+}
+
+export interface UpdateAppointmentData {
+  barberId?: string;
+  serviceId?: string;
+  appointmentDate?: string;
+  timeSlot?: string;
+  status?: string;
+}
+
+export interface AppointmentFilters {
+  status?: string;
+  date?: string;
+  barberId?: string;
+}
+
+// Appointments Service
+export class AppointmentsService {
+  // Create a new appointment
+  static async createAppointment(data: CreateAppointmentData): Promise<ApiResponse<Appointment>> {
+    try {
+      // Convert date from yyyy-mm-dd to dd/mm/yyyy format for backend
+      const [year, month, day] = data.appointmentDate.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+      
+      const appointmentData = {
+        ...data,
+        appointmentDate: formattedDate
+      };
+      
+      console.log('Sending appointment data to API:', appointmentData);
+      
+      return await apiClient.post<Appointment>('/appointments', appointmentData);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create appointment',
+      };
+    }
+  }
+
+  // Get user's appointments
+  static async getUserAppointments(filters?: AppointmentFilters): Promise<ApiResponse<Appointment[]>> {
+    try {
+      let endpoint = '/appointments/user/me';
+      
+      if (filters) {
+        const params = new URLSearchParams();
+        if (filters.status) params.append('status', filters.status);
+        if (filters.date) params.append('date', filters.date);
+        if (filters.barberId) params.append('barberId', filters.barberId);
+        
+        if (params.toString()) {
+          endpoint += `?${params.toString()}`;
+        }
+      }
+      
+      return await apiClient.get<Appointment[]>(endpoint);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch appointments',
+      };
+    }
+  }
+
+  // Get appointment by ID
+  static async getAppointmentById(id: string): Promise<ApiResponse<Appointment>> {
+    try {
+      return await apiClient.get<Appointment>(`/appointments/${id}`);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch appointment',
+      };
+    }
+  }
+
+  // Update appointment
+  static async updateAppointment(id: string, data: UpdateAppointmentData): Promise<ApiResponse<Appointment>> {
+    try {
+      return await apiClient.put<Appointment>(`/appointments/${id}`, data);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update appointment',
+      };
+    }
+  }
+
+  // Cancel appointment
+  static async cancelAppointment(id: string): Promise<ApiResponse<Appointment>> {
+    try {
+      return await apiClient.put<Appointment>(`/appointments/${id}/status`, { status: 'cancelled' });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel appointment',
+      };
+    }
+  }
+
+  // Reschedule appointment
+  static async rescheduleAppointment(id: string, newDate: string, newTimeSlot: string): Promise<ApiResponse<Appointment>> {
+    try {
+      return await apiClient.put<Appointment>(`/appointments/${id}/reschedule`, {
+        appointmentDate: newDate,
+        timeSlot: newTimeSlot,
+      });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to reschedule appointment',
+      };
+    }
+  }
+
+  // Delete appointment
+  static async deleteAppointment(id: string): Promise<ApiResponse<void>> {
+    try {
+      return await apiClient.delete<void>(`/appointments/${id}`);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete appointment',
+      };
+    }
+  }
+
+  // Get upcoming appointments
+  static async getUpcomingAppointments(): Promise<ApiResponse<Appointment[]>> {
+    try {
+      return await this.getUserAppointments({ status: 'confirmed' });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch upcoming appointments',
+      };
+    }
+  }
+
+  // Get past appointments
+  static async getPastAppointments(): Promise<ApiResponse<Appointment[]>> {
+    try {
+      return await this.getUserAppointments({ status: 'completed' });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch past appointments',
+      };
+    }
+  }
+
+  // Get pending appointments
+  static async getPendingAppointments(): Promise<ApiResponse<Appointment[]>> {
+    try {
+      return await this.getUserAppointments({ status: 'pending' });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch pending appointments',
+      };
+    }
+  }
+} 

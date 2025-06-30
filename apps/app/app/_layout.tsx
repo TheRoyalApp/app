@@ -25,24 +25,27 @@ export {
 
 export const unstable_settings = {
 	// Ensure that reloading on `/modal` keeps a back button present.
-	initialRouteName: '(tabs)',
+	initialRouteName: 'auth/welcome',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-	const { user, isLoading } = useAuth();
+	const { user, isLoading, isFirstTime } = useAuth();
 
 	if (isLoading) {
 		return <LoadingScreen />;
 	}
 
+	// Si es la primera vez o no hay usuario autenticado, mostrar pantallas de auth
+	const shouldShowAuth = isFirstTime || !user;
+
 	return (
 		<ThemeProvider value={DarkTheme}>
 			<Stack screenOptions={{ headerShown: false }}>
-				{!user ? (
-					// Auth screens
+				{shouldShowAuth ? (
+					// Auth screens - siempre empezar con welcome si es primera vez
 					<>
 						<Stack.Screen name="auth/welcome" options={{ headerShown: false }} />
 						<Stack.Screen name="auth/login" options={{ headerShown: false }} />
@@ -50,7 +53,7 @@ function RootLayoutNav() {
 					</>
 				) : (
 					<>
-						{/* Main app screens */}
+						{/* Main app screens - solo accesibles con usuario autenticado */}
 						<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 						<Stack.Screen name="appoinment" options={{ headerShown: true, title: 'Agendar cita' }} />
 					</>

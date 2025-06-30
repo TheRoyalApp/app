@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 interface ServiceCardProps {
 	title: string;
-	price: number;
+	price: string | number;
 	description: string | string[];
 	selected?: [string | null, (service: string | null) => void];
 }
@@ -46,6 +46,7 @@ export default function ServiceCard({
 			onPress={() => toggleSelected()}
 			style={{
 				width: '100%',
+				backgroundColor: Colors.dark.background,
 				borderColor: Colors.dark.gray,
 				borderWidth: 1,
 				borderRadius: 8,
@@ -58,7 +59,10 @@ export default function ServiceCard({
 					{title}
 				</ThemeText>
 				<ThemeText style={{ fontSize: 16, color: Colors.dark.textLight }}>
-					${price.toFixed(2)}
+					{new Intl.NumberFormat('es-MX', {
+						style: 'currency',
+						currency: 'MXN',
+					}).format(typeof price === 'string' ? parseFloat(price) : price)}
 				</ThemeText>
 				{Array.isArray(description) ? (
 					description.map((line, idx) => (

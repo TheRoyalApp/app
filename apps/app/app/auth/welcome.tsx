@@ -16,13 +16,17 @@ const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { clearStorage } = useAuth();
+  const { clearStorage, markWelcomeAsSeen } = useAuth();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    // Marcar la pantalla de bienvenida como vista
+    await markWelcomeAsSeen();
     router.push('/auth/login');
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
+    // Marcar la pantalla de bienvenida como vista
+    await markWelcomeAsSeen();
     router.push('/auth/signup');
   };
 
@@ -56,6 +60,9 @@ export default function WelcomeScreen() {
             Reserva tu cita de manera fácil y rápida. 
             Disfruta de los mejores servicios de barbería.
           </Text>
+          <Text style={styles.descriptionSubtext}>
+            Para continuar, inicia sesión o crea tu cuenta
+          </Text>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -74,12 +81,14 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
 
           {/* Botón para limpiar almacenamiento (solo para desarrollo) */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={handleClearStorage}
-          >
-            <Text style={styles.debugButtonText}>🔧 Limpiar Datos (Dev)</Text>
-          </TouchableOpacity>
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.debugButton}
+              onPress={handleClearStorage}
+            >
+              <Text style={styles.debugButtonText}>🔧 Limpiar Datos (Dev)</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </LinearGradient>
@@ -139,6 +148,14 @@ const styles = StyleSheet.create({
     color: Colors.dark.textLight,
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  descriptionSubtext: {
+    fontSize: 14,
+    color: Colors.dark.primary,
+    textAlign: 'center',
+    fontWeight: '500',
     paddingHorizontal: 20,
   },
   buttonContainer: {

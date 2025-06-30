@@ -121,6 +121,7 @@ export async function signup(c: Context) {
       user: {
         id: user.id,
         email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
@@ -129,10 +130,8 @@ export async function signup(c: Context) {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       },
-      tokens: {
-        token,
-        refreshToken
-      }
+      accessToken: token,
+      refreshToken
     }), 201);
 
   } catch (error) {
@@ -186,14 +185,15 @@ export async function signin(c: Context) {
       user: {
         id: user.id,
         email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
+        isAdmin: user.isAdmin,
         role: user.role
       },
-      tokens: {
-        token,
-        refreshToken
-      }
+      accessToken: token,
+      refreshToken
     }));
 
   } catch (error) {
@@ -220,10 +220,18 @@ export async function refresh(c: Context) {
     winstonLogger.info('Token refreshed successfully', { userId: user.id });
 
     return c.json(successResponse(200, {
-      tokens: {
-        token: newToken,
-        refreshToken: newRefreshToken
-      }
+      user: {
+        id: user.id,
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        isAdmin: user.isAdmin,
+        role: user.role
+      },
+      accessToken: newToken,
+      refreshToken: newRefreshToken
     }));
 
   } catch (error) {
