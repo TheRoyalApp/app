@@ -1,0 +1,23 @@
+{
+  "name": "the_royal_barber",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter mobile ios\"",
+    "dev:api": "pnpm --filter api dev",
+    "dev:mobile": "pnpm --filter mobile ios"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.8.1",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  },
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ]
+}

@@ -1,0 +1,478 @@
+import { Hono } from 'hono';
+import { getDatabase } from '../db/connection.js';
+import { services, payments, appointments } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import Stripe from 'stripe';
+import { errorResponse, successResponse } from '../helpers/response.helper.js';
+import { PaymentHelper } from './payment.helper.js';
+import { 
+  createPayment, 
+  updatePayment, 
+  getPaymentById, 
+  getPaymentByTransactionId, 
+  getUserPayments 
+} from './payments.controller.js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2025-05-28.basil',
+});
+
+export const paymentsRoute = new Hono();
+
+// Payment CRUD routes
+paymentsRoute.post('/', async (c) => {
+    try {
+        const paymentData = await c.req.json();
+        
+        if (!paymentData.amount || !paymentData.paymentMethod || !paymentData.status || !paymentData.transactionId) {
+            return c.json(errorResponse(400, 'Missing required fields'), 400);
+        }
+
+        const { data, error } = await createPayment(paymentData);
+
+        if (error) {
+            const statusCode = error.includes('Missing required fields') ? 400 : 500;
+            return c.json(errorResponse(statusCode, error), statusCode);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(500, 'Failed to create payment'), 500);
+        }
+
+        return c.json(successResponse(201, data), 201);
+    } catch (error) {
+        console.error('Error creating payment:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
+paymentsRoute.put('/:id', async (c) => {
+    try {
+        const { id } = c.req.param();
+        const updateData = await c.req.json();
+        
+        if (!id) {
+            return c.json(errorResponse(400, 'Payment ID is required'), 400);
+        }
+
+        const { data, error } = await updatePayment(id, updateData);
+
+        if (error) {
+            const statusCode = error.includes('not found') ? 404 : 
+                              error.includes('required') ? 400 : 500;
+            return c.json(errorResponse(statusCode, error), statusCode);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(500, 'Failed to update payment'), 500);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error updating payment:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
+paymentsRoute.get('/:id', async (c) => {
+    try {
+        const { id } = c.req.param();
+        
+        if (!id) {
+            return c.json(errorResponse(400, 'Payment ID is required'), 400);
+        }
+
+        const { data, error } = await getPaymentById(id);
+
+        if (error) {
+            const statusCode = error.includes('not found') ? 404 : 
+                              error.includes('required') ? 400 : 500;
+            return c.json(errorResponse(statusCode, error), statusCode);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'Payment not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error getting payment:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
+paymentsRoute.get('/transaction/:transactionId', async (c) => {
+    try {
+        const { transactionId } = c.req.param();
+        
+        if (!transactionId) {
+            return c.json(errorResponse(400, 'Transaction ID is required'), 400);
+        }
+
+        const { data, error } = await getPaymentByTransactionId(transactionId);
+
+        if (error) {
+            const statusCode = error.includes('not found') ? 404 : 
+                              error.includes('required') ? 400 : 500;
+            return c.json(errorResponse(statusCode, error), statusCode);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'Payment not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error getting payment by transaction ID:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
+paymentsRoute.get('/user/:userId', async (c) => {
+    try {
+        const { userId } = c.req.param();
+        
+        if (!userId) {
+            return c.json(errorResponse(400, 'User ID is required'), 400);
+        }
+
+        const { data, error } = await getUserPayments(userId);
+
+        if (error) {
+            const statusCode = error.includes('required') ? 400 : 500;
+            return c.json(errorResponse(statusCode, error), statusCode);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'No payments found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error getting user payments:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
+/**
+ * POST /payments/checkout
+ * Body: { 
+ *   serviceId: string, 
+ *   paymentType: 'full' | 'advance', 
+ *   successUrl: string, 
+ *   cancelUrl: string,
+ *   userId?: string,
+ *   appointmentData?: {
+ *     barberId: string,
+ *     appointmentDate: string,
+ *     timeSlot: string,
+ *     notes?: string
+ *   }
+ * }
+ * Returns: { url: string }
+ */
+paymentsRoute.post('/checkout', async (c) => {
+  try {
+    const { 
+      serviceId, 
+      paymentType, 
+      successUrl, 
+      cancelUrl, 
+      userId,
+      appointmentData 
+    } = await c.req.json();
+    
+    if (!serviceId || !paymentType || !successUrl || !cancelUrl) {
+      return c.json(errorResponse(400, 'Missing required fields'), 400);
+    }
+
+    const db = await getDatabase();
+    const [service] = await db.select().from(services).where(eq(services.id, serviceId));
+    if (!service) {
+      return c.json(errorResponse(404, 'Service not found'), 404);
+    }
+
+    let priceId: string | undefined;
+    if (paymentType === 'full') {
+      priceId = service.stripePriceId || undefined;
+    } else if (paymentType === 'advance') {
+      priceId = service.stripeAdvancePriceId || undefined;
+    }
+    if (!priceId) {
+      return c.json(errorResponse(400, 'Selected payment option is not available for this service'), 400);
+    }
+
+    // Prepare metadata for Stripe session
+    const metadata: Record<string, string> = {
+      serviceId,
+      paymentType,
+    };
+
+    // Add appointment data to metadata if provided
+    if (appointmentData) {
+      metadata.barberId = appointmentData.barberId;
+      metadata.appointmentDate = appointmentData.appointmentDate;
+      metadata.timeSlot = appointmentData.timeSlot;
+      if (appointmentData.notes) {
+        metadata.notes = appointmentData.notes;
+      }
+    }
+
+    if (userId) {
+      metadata.userId = userId;
+    }
+
+    // Create Stripe Checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card', 'paypal'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata,
+    });
+
+    return c.json(successResponse(200, { url: session.url }), 200);
+  } catch (error) {
+    console.error('Error creating Stripe Checkout session:', error);
+    return c.json(errorResponse(500, 'Failed to create Stripe Checkout session'), 500);
+  }
+});
+
+/**
+ * POST /payments/webhook
+ * Handles Stripe webhook events for payment confirmation
+ */
+paymentsRoute.post('/webhook', async (c) => {
+  const signature = c.req.header('stripe-signature');
+  const body = await c.req.text();
+
+  let event: Stripe.Event;
+
+  try {
+    // In development, allow webhook processing without signature verification
+    if (process.env.NODE_ENV === 'development' && !signature) {
+      console.log('Development mode: Processing webhook without signature verification');
+      event = JSON.parse(body) as Stripe.Event;
+    } else {
+      if (!signature) {
+        return c.json(errorResponse(400, 'Missing Stripe signature'), 400);
+      }
+
+      event = await stripe.webhooks.constructEventAsync(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET || ''
+      );
+    }
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err);
+    return c.json(errorResponse(400, 'Invalid signature'), 400);
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object as Stripe.Checkout.Session;
+        
+        // Extract metadata
+        const serviceId = session.metadata?.serviceId;
+        const paymentType = session.metadata?.paymentType;
+        const userId = session.metadata?.userId;
+        const barberId = session.metadata?.barberId;
+        const appointmentDate = session.metadata?.appointmentDate;
+        const timeSlot = session.metadata?.timeSlot;
+        const notes = session.metadata?.notes;
+        
+        if (!serviceId || !paymentType) {
+          console.error('Missing serviceId or paymentType in session metadata');
+          return c.json(errorResponse(400, 'Invalid session metadata'), 400);
+        }
+
+        try {
+          // 1. Create payment record
+          const db = await getDatabase();
+          const [payment] = await db.insert(payments).values({
+            amount: (session.amount_total || 0).toString(),
+            paymentMethod: 'stripe',
+            status: 'completed',
+            transactionId: session.id,
+          }).returning();
+
+          if (!payment) {
+            throw new Error('Failed to create payment record');
+          }
+
+          console.log(`Payment created with ID: ${payment.id}`);
+
+          // 2. If appointment data is provided, create the appointment
+          if (barberId && appointmentDate && timeSlot && userId) {
+            // Convert dd/mm/yyyy to Date object
+            const dateParts = appointmentDate.split('/');
+            if (dateParts.length === 3) {
+              const [day, month, year] = dateParts;
+              if (day && month && year) {
+                const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                
+                // Create appointment with confirmed status
+                const [appointment] = await db.insert(appointments).values({
+                  userId: userId as string,
+                  barberId: barberId as string,
+                  serviceId: serviceId as string,
+                  appointmentDate: targetDate,
+                  timeSlot: timeSlot as string,
+                  status: 'confirmed', // Automatically set to confirmed
+                  notes: notes || undefined,
+                }).returning();
+
+                if (appointment) {
+                  // 3. Update payment to link it to the appointment
+                  await db.update(payments)
+                    .set({ appointmentId: appointment.id })
+                    .where(eq(payments.id, payment.id));
+
+                  console.log(`Appointment created with ID: ${appointment.id} and status: confirmed`);
+                  console.log(`Payment ${payment.id} linked to appointment ${appointment.id}`);
+                }
+              }
+            }
+          }
+
+          console.log(`Payment completed for service ${serviceId} with ${paymentType} payment`);
+          
+        } catch (error) {
+          console.error('Error handling successful payment:', error);
+          // Don't return error here as Stripe will retry the webhook
+        }
+        
+        break;
+
+      case 'payment_intent.succeeded':
+        console.log('Payment intent succeeded:', event.data.object.id);
+        break;
+
+      case 'payment_intent.payment_failed':
+        console.log('Payment intent failed:', event.data.object.id);
+        break;
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return c.json(successResponse(200, { received: true }), 200);
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    return c.json(errorResponse(500, 'Webhook processing failed'), 500);
+  }
+});
+
+/**
+ * POST /payments/test-webhook
+ * Test endpoint to manually trigger payment completion logic
+ */
+paymentsRoute.post('/test-webhook', async (c) => {
+  try {
+    const { sessionId, serviceId, paymentType, userId, barberId, appointmentDate, timeSlot, notes, amount } = await c.req.json();
+    
+    if (!sessionId || !serviceId || !paymentType) {
+      return c.json(errorResponse(400, 'Missing required fields'), 400);
+    }
+
+    const db = await getDatabase();
+    
+    // 1. Create payment record
+    const [payment] = await db.insert(payments).values({
+      amount: (amount || 2500).toString(),
+      paymentMethod: 'stripe',
+      status: 'completed',
+      transactionId: sessionId,
+    }).returning();
+
+    if (!payment) {
+      throw new Error('Failed to create payment record');
+    }
+
+    console.log(`Payment created with ID: ${payment.id}`);
+
+    // 2. If appointment data is provided, create the appointment
+    if (barberId && appointmentDate && timeSlot && userId) {
+      // Convert dd/mm/yyyy to Date object
+      const dateParts = appointmentDate.split('/');
+      if (dateParts.length === 3) {
+        const [day, month, year] = dateParts;
+        if (day && month && year) {
+          const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          
+          // Create appointment with confirmed status
+          const [appointment] = await db.insert(appointments).values({
+            userId: userId as string,
+            barberId: barberId as string,
+            serviceId: serviceId as string,
+            appointmentDate: targetDate,
+            timeSlot: timeSlot as string,
+            status: 'confirmed', // Automatically set to confirmed
+            notes: notes || undefined,
+          }).returning();
+
+          if (appointment) {
+            // 3. Update payment to link it to the appointment
+            await db.update(payments)
+              .set({ appointmentId: appointment.id })
+              .where(eq(payments.id, payment.id));
+
+            console.log(`Appointment created with ID: ${appointment.id} and status: confirmed`);
+            console.log(`Payment ${payment.id} linked to appointment ${appointment.id}`);
+            
+            return c.json(successResponse(200, {
+              payment,
+              appointment,
+              message: 'Payment and appointment created successfully with confirmed status'
+            }), 200);
+          }
+        }
+      }
+    }
+
+    return c.json(successResponse(200, {
+      payment,
+      message: 'Payment created successfully'
+    }), 200);
+    
+  } catch (error) {
+    console.error('Error in test webhook:', error);
+    return c.json(errorResponse(500, 'Test webhook failed'), 500);
+  }
+});
+
+/**
+ * GET /payments/session/:sessionId
+ * Verify payment session status
+ */
+paymentsRoute.get('/session/:sessionId', async (c) => {
+  try {
+    const { sessionId } = c.req.param();
+    
+    if (!sessionId) {
+      return c.json(errorResponse(400, 'Session ID is required'), 400);
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    return c.json(successResponse(200, {
+      sessionId: session.id,
+      status: session.status,
+      paymentStatus: session.payment_status,
+      metadata: session.metadata,
+      amountTotal: session.amount_total,
+      currency: session.currency,
+    }), 200);
+  } catch (error) {
+    console.error('Error retrieving session:', error);
+    return c.json(errorResponse(500, 'Failed to retrieve session'), 500);
+  }
+}); 

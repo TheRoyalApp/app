@@ -1,0 +1,1 @@
+ALTER TABLE "services" ADD COLUMN "stripe_advance_price_id" text;

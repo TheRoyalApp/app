@@ -1,0 +1,47 @@
+{
+  "name": "api",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
+    "drizzle-kit": "^0.31.4"
+  },
+  "scripts": {
+    "start": "bun run src/index",
+    "dev": "bun --watch src/",
+    "test": "bun run tests/test-endpoints.js",
+    "test:appointments": "bun run tests/test-appointments.js",
+    "test:all": "bun run tests/test-endpoints.js && bun run tests/test-appointments.js",
+    "test:production": "bun run tests/production-test-suite.js",
+    "test:typescript": "bun test tests/production-test-suite.test.ts",
+    "test:comprehensive": "bun run tests/production-test-suite.js && bun test tests/production-test-suite.test.ts",
+    "test:coverage": "bun test --coverage tests/",
+    "test:full": "bun run tests/run-production-tests.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:push": "drizzle-kit push"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.4",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.6.0",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.7.9",
+    "jsonwebtoken": "^9.0.2",
+    "nodemon": "^3.1.10",
+    "postgres": "^3.4.7",
+    "stripe": "^18.2.1",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0",
+    "zod": "^3.25.67"
+  }
+}
