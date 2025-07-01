@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,16 +19,9 @@ import { ServiceInterface, haircuts, spa } from '../../constants/services';
 import { availableTimesData } from '../../constants/availability';
 import AvailabilityEditor from '../../components/ui/AvailabilityEditor';
 import ServiceEditor from '../../components/ui/ServiceEditor';
-
-interface Appointment {
-  id: string;
-  clientName: string;
-  service: string;
-  date: string;
-  time: string;
-  status: 'confirmed' | 'pending' | 'cancelled';
-  phone: string;
-}
+import { AppointmentsService, Appointment as ApiAppointment } from '../../services/appointments.service';
+import { ServicesService, Service as ApiService } from '../../services/services.service';
+import { SchedulesService, BarberSchedule } from '../../services/schedules.service';
 
 interface AdminService extends ServiceInterface {
   id: string;
@@ -42,86 +36,65 @@ interface DaySchedule {
 }
 
 const AdminPanel = () => {
-  const { user, signOut } = useAuth();
+  const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'availability'>('appointments');
   const [refreshing, setRefreshing] = useState(false);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<AdminService[]>([]);
-  const [availability, setAvailability] = useState(availableTimesData);
+  const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
+  const [services, setServices] = useState<ApiService[]>([]);
+  const [schedules, setSchedules] = useState<BarberSchedule[]>([]);
   const [showAvailabilityEditor, setShowAvailabilityEditor] = useState(false);
   const [showServiceEditor, setShowServiceEditor] = useState(false);
   const [editingDay, setEditingDay] = useState<string>('default');
-  const [editingService, setEditingService] = useState<AdminService | null>(null);
+  const [editingService, setEditingService] = useState<ApiService | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Mock appointments data
+  // Fetch appointments, services, and schedules from API
   useEffect(() => {
-    const mockAppointments: Appointment[] = [
-      {
-        id: '1',
-        clientName: 'Juan Pérez',
-        service: 'Corte Royal',
-        date: '2024-01-15',
-        time: '10:00 AM',
-        status: 'confirmed',
-        phone: '+1234567890',
-      },
-      {
-        id: '2',
-        clientName: 'Carlos Rodríguez',
-        service: 'Barba King',
-        date: '2024-01-15',
-        time: '11:30 AM',
-        status: 'pending',
-        phone: '+1234567891',
-      },
-      {
-        id: '3',
-        clientName: 'Miguel García',
-        service: 'Manicure Spa',
-        date: '2024-01-16',
-        time: '02:00 PM',
-        status: 'confirmed',
-        phone: '+1234567892',
-      },
-      {
-        id: '4',
-        clientName: 'Roberto Silva',
-        service: 'Corte Imperial',
-        date: '2024-01-17',
-        time: '09:00 AM',
-        status: 'pending',
-        phone: '+1234567893',
-      },
-      {
-        id: '5',
-        clientName: 'Fernando López',
-        service: 'Limpieza Facial',
-        date: '2024-01-17',
-        time: '03:30 PM',
-        status: 'confirmed',
-        phone: '+1234567894',
-      },
-    ];
-    setAppointments(mockAppointments);
+    if (!isLoading && user) {
+      console.log('AdminPanel: user is set, fetching data:', user);
+      fetchAllData();
+    } else {
+      console.log('AdminPanel: waiting for user or still loading. isLoading:', isLoading, 'user:', user);
+    }
+  }, [user, isLoading, activeTab]);
 
-    // Initialize services
-    const allServices: AdminService[] = [
-      ...haircuts.map((service, index) => ({
-        ...service,
-        id: `barber-${index}`,
-        category: 'barber' as const,
-        isActive: true,
-      })),
-      ...spa.map((service, index) => ({
-        ...service,
-        id: `spa-${index}`,
-        category: 'spa' as const,
-        isActive: true,
-      })),
-    ];
-    setServices(allServices);
-  }, []);
+  const fetchAllData = async () => {
+    if (!user) {
+      console.log('fetchAllData: No user, aborting fetch.');
+      return;
+    }
+    setRefreshing(true);
+    // Appointments
+    if (activeTab === 'appointments') {
+      // Both admin and staff fetch all appointments
+      const res = await AppointmentsService.getAllAppointments();
+      console.log('Fetched appointments:', res);
+      if (res && res.success && res.data) {
+        // Filter out completed appointments
+        setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
+      } else setAppointments([]);
+    }
+    // Services
+    if (activeTab === 'services') {
+      const res = await ServicesService.getAllServices();
+      if (res.success && res.data) setServices(res.data);
+      else setServices([]);
+    }
+    // Schedules
+    if (activeTab === 'availability') {
+      if (user.isAdmin) {
+        const res = await SchedulesService.getAllSchedules();
+        if (res.success && res.data) setSchedules(res.data);
+        else setSchedules([]);
+      } else if (user.role === 'staff') {
+        const res = await SchedulesService.getBarberSchedules(user.id);
+        if (res.success && res.data) setSchedules(res.data);
+        else setSchedules([]);
+      }
+    }
+    setRefreshing(false);
+  };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -149,11 +122,39 @@ const AdminPanel = () => {
     );
   };
 
-  const updateAppointmentStatus = (id: string, status: Appointment['status']) => {
-    setAppointments(prev =>
-      prev.map(appointment =>
-        appointment.id === id ? { ...appointment, status } : appointment
-      )
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  };
+
+  const updateAppointmentStatus = async (id: string, status: ApiAppointment['status']) => {
+    Alert.alert(
+      'Confirmar cambio de estado',
+      `¿Estás seguro de que quieres marcar la cita como "${status}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, actualizar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUpdatingId(id + status);
+              const res = await AppointmentsService.updateAppointment(id, { status });
+              console.log('Update response:', res);
+              if (res.success) {
+                Alert.alert('Éxito', `Estado actualizado a ${status}`);
+                fetchAllData();
+              } else {
+                Alert.alert('Error', res.error || 'No se pudo actualizar el estado');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo actualizar el estado');
+            } finally {
+              setUpdatingId(null);
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -165,87 +166,105 @@ const AdminPanel = () => {
     );
   };
 
-  const handleEditService = (service: AdminService) => {
-    setEditingService(service);
+  const handleEditService = (service: ApiService) => {
+    // Convert API service to UI format for editor
+    setEditingService({
+      ...service,
+      description: service.description ? [service.description] : [],
+    } as any);
     setShowServiceEditor(true);
   };
 
-  const handleSaveService = (updatedService: ServiceInterface) => {
-    if (editingService) {
-      setServices(prev =>
-        prev.map(service =>
-          service.id === editingService.id
-            ? { ...service, ...updatedService }
-            : service
-        )
-      );
+  const handleSaveService = async (serviceData: any) => {
+    // Convert UI format to API format
+    const apiData = {
+      ...serviceData,
+      description: Array.isArray(serviceData.description) ? serviceData.description.join(' ') : serviceData.description,
+      price: typeof serviceData.price === 'string' ? parseFloat(serviceData.price) : serviceData.price,
+    };
+    if (editingService && editingService.id) {
+      // Update existing service
+      await ServicesService.updateService(editingService.id, apiData);
+    } else {
+      // Create new service
+      await ServicesService.createService(apiData);
     }
+    setShowServiceEditor(false);
     setEditingService(null);
+    fetchAllData();
   };
 
-  const handleAddService = (category: 'barber' | 'spa') => {
+  const handleAddService = () => {
     setEditingService({
-      id: `new-${Date.now()}`,
       name: '',
       price: 0,
-      description: [''],
-      category,
+      description: [],
+      duration: 30,
       isActive: true,
-    });
+      id: '',
+      createdAt: '',
+      updatedAt: '',
+    } as any);
     setShowServiceEditor(true);
   };
 
-  const handleDeleteService = (id: string) => {
-    Alert.alert(
-      'Eliminar Servicio',
-      '¿Estás seguro de que quieres eliminar este servicio?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            setServices(prev => prev.filter(service => service.id !== id));
-          },
-        },
-      ]
-    );
+  const handleDeleteService = async (id: string) => {
+    await ServicesService.deleteService(id);
+    fetchAllData();
   };
 
-  const handleEditAvailability = (day: string) => {
-    setEditingDay(day);
+  const handleEditAvailability = (dayOfWeek: number) => {
+    setEditingDay(dayOfWeek.toString());
     setShowAvailabilityEditor(true);
   };
 
-  const handleSaveAvailability = (schedule: DaySchedule) => {
-    const times = schedule.isOpen ? schedule.timeSlots.map(slot => slot.time) : [];
-    setAvailability(prev => ({
-      ...prev,
-      [schedule.day]: times,
-    }));
+  const handleSaveAvailability = async (uiSchedule: any) => {
+    // Convert DaySchedule (UI) to BarberSchedule (API)
+    const dayOfWeek = parseInt(uiSchedule.day, 10);
+    const availableTimeSlots = uiSchedule.timeSlots.map((slot: any) => slot.time);
+    const schedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
+    if (schedule) {
+      await SchedulesService.updateSchedule(schedule.id, {
+        barberId: schedule.barberId,
+        dayOfWeek,
+        availableTimeSlots,
+      });
+    } else {
+      await SchedulesService.setBarberSchedule({
+        barberId: user?.id || '',
+        dayOfWeek,
+        availableTimeSlots,
+      });
+    }
+    setShowAvailabilityEditor(false);
+    fetchAllData();
   };
 
-  const getStatusColor = (status: Appointment['status']) => {
+  const getStatusColor = (status: ApiAppointment['status']) => {
     switch (status) {
       case 'confirmed':
         return Colors.dark.primary;
       case 'pending':
-        return Colors.dark.textLight;
+        return '#FFA500'; // orange
+      case 'completed':
+        return '#2ecc40'; // green
       case 'cancelled':
-        return '#ff3b30';
+        return '#ff3b30'; // red
       default:
         return Colors.dark.text;
     }
   };
 
-  const getStatusText = (status: Appointment['status']) => {
+  const getStatusText = (status: ApiAppointment['status']) => {
     switch (status) {
       case 'confirmed':
-        return 'Activo';
+        return 'Confirmada';
       case 'pending':
         return 'Pendiente';
+      case 'completed':
+        return 'Completado';
       case 'cancelled':
-        return 'Inactivo';
+        return 'Cancelado';
       default:
         return status;
     }
@@ -264,30 +283,37 @@ const AdminPanel = () => {
             <ThemeText style={styles.emptyStateText}>No hay citas programadas</ThemeText>
           </View>
         ) : (
-          appointments.map((appointment) => (
-            <View key={appointment.id} style={styles.card}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <ThemeText style={styles.cardTitle}>{appointment.clientName}</ThemeText>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(appointment.status) }]}>
-                  <ThemeText style={styles.statusText}>{getStatusText(appointment.status)}</ThemeText>
+          appointments.map((appointment) => {
+            // Support both API and DB join fields
+            const a = appointment as any;
+            return (
+              <View key={appointment.id} style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <ThemeText style={styles.cardTitle}>{a.customerName || appointment.user?.name || appointment.userId}</ThemeText>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(appointment.status) }]}> 
+                    <ThemeText style={styles.statusText}>{getStatusText(appointment.status)}</ThemeText>
+                  </View>
+                </View>
+                <ThemeText style={styles.cardPrice}>{a.serviceName || appointment.service?.name || appointment.serviceId}</ThemeText>
+                <ThemeText style={styles.cardDescription}>{formatDate(appointment.appointmentDate)} - {appointment.timeSlot}</ThemeText>
+                <ThemeText style={styles.cardDescription}>{appointment.user?.email || ''}</ThemeText>
+                <View style={{ flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                  <Button onPress={() => updateAppointmentStatus(appointment.id, 'confirmed')} style={[styles.confirmButton, { backgroundColor: Colors.dark.primary, borderColor: Colors.dark.primary }]} disabled={updatingId === appointment.id + 'confirmed'}>
+                    {updatingId === appointment.id + 'confirmed' ? <ActivityIndicator color="#fff" /> : 'Confirmar'}
+                  </Button>
+                  <Button onPress={() => updateAppointmentStatus(appointment.id, 'pending')} style={[styles.confirmButton, { backgroundColor: '#FFA500', borderColor: '#FFA500' }]} disabled={updatingId === appointment.id + 'pending'}>
+                    {updatingId === appointment.id + 'pending' ? <ActivityIndicator color="#fff" /> : 'Pendiente'}
+                  </Button>
+                  <Button onPress={() => updateAppointmentStatus(appointment.id, 'completed')} style={[styles.confirmButton, { backgroundColor: '#2ecc40', borderColor: '#2ecc40' }]} disabled={updatingId === appointment.id + 'completed'}>
+                    {updatingId === appointment.id + 'completed' ? <ActivityIndicator color="#fff" /> : 'Completar'}
+                  </Button>
+                  <Button onPress={() => updateAppointmentStatus(appointment.id, 'cancelled')} style={styles.cancelButton} disabled={updatingId === appointment.id + 'cancelled'}>
+                    {updatingId === appointment.id + 'cancelled' ? <ActivityIndicator color="#fff" /> : 'Cancelar'}
+                  </Button>
                 </View>
               </View>
-              <ThemeText style={styles.cardPrice}>{appointment.service}</ThemeText>
-              <ThemeText style={styles.cardDescription}>{appointment.date} - {appointment.time}</ThemeText>
-              <ThemeText style={styles.cardDescription}>{appointment.phone}</ThemeText>
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                {appointment.status === 'pending' && (
-                  <>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'confirmed')} style={styles.confirmButton}>Confirmar</Button>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'cancelled')} style={styles.cancelButton}>Cancelar</Button>
-                  </>
-                )}
-                {appointment.status === 'confirmed' && (
-                  <Button onPress={() => updateAppointmentStatus(appointment.id, 'cancelled')} style={styles.cancelButton}>Cancelar</Button>
-                )}
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </Container>
     </ScrollView>
@@ -297,62 +323,31 @@ const AdminPanel = () => {
     <ScrollView showsVerticalScrollIndicator={false}>
       <Container>
         <View style={styles.sectionHeader}>
-          <ThemeText style={styles.sectionTitle}>Servicios de Barbería</ThemeText>
-          <Button onPress={() => handleAddService('barber')} style={styles.addButton}>+ Nuevo</Button>
+          <ThemeText style={styles.sectionTitle}>Servicios</ThemeText>
+          <Button onPress={() => handleAddService()} style={styles.addButton}>+ Nuevo</Button>
         </View>
-        {services
-          .filter(service => service.category === 'barber')
-          .map((service) => (
-            <View key={service.id} style={styles.card}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <ThemeText style={styles.cardTitle}>{service.name}</ThemeText>
-                <View style={[styles.statusBadge, { backgroundColor: service.isActive ? Colors.dark.primary : Colors.dark.gray }]}>
-                  <ThemeText style={{ ...styles.statusText, color: Colors.dark.background }}>{service.isActive ? 'Activo' : 'Inactivo'}</ThemeText>
-                </View>
-              </View>
-              <ThemeText style={styles.cardPrice}>${service.price}</ThemeText>
-              {service.description.map((desc, idx) => (
-                <ThemeText key={idx} style={styles.cardDescription}>• {desc}</ThemeText>
-              ))}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <TouchableOpacity style={styles.editServiceButton} onPress={() => handleEditService(service)}>
-                  <ThemeText style={styles.editServiceButtonText}>✏️</ThemeText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteServiceButton} onPress={() => handleDeleteService(service.id)}>
-                  <ThemeText style={styles.deleteServiceButtonText}>🗑️</ThemeText>
-                </TouchableOpacity>
+        {services.map((service) => (
+          <View key={service.id} style={styles.card}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <ThemeText style={styles.cardTitle}>{service.name}</ThemeText>
+              <View style={[styles.statusBadge, { backgroundColor: service.isActive ? Colors.dark.primary : Colors.dark.gray }]}>
+                <ThemeText style={{ ...styles.statusText, color: Colors.dark.background }}>{service.isActive ? 'Activo' : 'Inactivo'}</ThemeText>
               </View>
             </View>
-          ))}
-
-        <View style={styles.sectionHeader}>
-          <ThemeText style={styles.sectionTitle}>Servicios de Spa</ThemeText>
-          <Button onPress={() => handleAddService('spa')} style={styles.addButton}>+ Nuevo</Button>
-        </View>
-        {services
-          .filter(service => service.category === 'spa')
-          .map((service) => (
-            <View key={service.id} style={styles.card}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <ThemeText style={styles.cardTitle}>{service.name}</ThemeText>
-                <View style={[styles.statusBadge, { backgroundColor: service.isActive ? Colors.dark.primary : Colors.dark.gray }]}>
-                  <ThemeText style={{ ...styles.statusText, color: Colors.dark.background }}>{service.isActive ? 'Activo' : 'Inactivo'}</ThemeText>
-                </View>
-              </View>
-              <ThemeText style={styles.cardPrice}>${service.price}</ThemeText>
-              {service.description.map((desc, idx) => (
-                <ThemeText key={idx} style={styles.cardDescription}>• {desc}</ThemeText>
-              ))}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <TouchableOpacity style={styles.editServiceButton} onPress={() => handleEditService(service)}>
-                  <ThemeText style={styles.editServiceButtonText}>✏️</ThemeText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteServiceButton} onPress={() => handleDeleteService(service.id)}>
-                  <ThemeText style={styles.deleteServiceButtonText}>🗑️</ThemeText>
-                </TouchableOpacity>
-              </View>
+            <ThemeText style={styles.cardPrice}>${service.price}</ThemeText>
+            {service.description && (
+              <ThemeText style={styles.cardDescription}>{service.description}</ThemeText>
+            )}
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <TouchableOpacity style={styles.editServiceButton} onPress={() => handleEditService(service)}>
+                <ThemeText style={styles.editServiceButtonText}>✏️</ThemeText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteServiceButton} onPress={() => handleDeleteService(service.id)}>
+                <ThemeText style={styles.deleteServiceButtonText}>🗑️</ThemeText>
+              </TouchableOpacity>
             </View>
-          ))}
+          </View>
+        ))}
       </Container>
     </ScrollView>
   );
@@ -365,15 +360,15 @@ const AdminPanel = () => {
           Configura los horarios disponibles para cada día de la semana
         </ThemeText>
         
-        {Object.entries(availability).map(([day, times]) => (
-          <View key={day} style={styles.card}>
+        {schedules.map((schedule) => (
+          <View key={schedule.id} style={styles.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <ThemeText style={styles.cardTitle}>{day === 'default' ? 'Horario General' : day}</ThemeText>
-              <ThemeText style={styles.cardDescription}>{times.length} horarios</ThemeText>
+              <ThemeText style={styles.cardTitle}>Día: {schedule.dayOfWeek}</ThemeText>
+              <ThemeText style={styles.cardDescription}>{schedule.availableTimeSlots.length} horarios</ThemeText>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-              {times.length > 0 ? (
-                times.map((time, idx) => (
+              {schedule.availableTimeSlots.length > 0 ? (
+                schedule.availableTimeSlots.map((time, idx) => (
                   <View key={idx} style={styles.timeSlot}>
                     <ThemeText style={styles.timeText}>{time}</ThemeText>
                   </View>
@@ -382,7 +377,7 @@ const AdminPanel = () => {
                 <ThemeText style={styles.noTimesText}>Sin horarios configurados</ThemeText>
               )}
             </View>
-            <Button onPress={() => handleEditAvailability(day)} style={styles.editButton}>Editar Horarios</Button>
+            <Button onPress={() => handleEditAvailability(schedule.dayOfWeek)} style={styles.editButton}>Editar Horarios</Button>
           </View>
         ))}
       </Container>
@@ -461,14 +456,20 @@ const AdminPanel = () => {
         visible={showAvailabilityEditor}
         onClose={() => setShowAvailabilityEditor(false)}
         onSave={handleSaveAvailability}
-        initialSchedule={{
-          day: editingDay,
-          isOpen: availability[editingDay]?.length > 0,
-          timeSlots: availability[editingDay]?.map((time, index) => ({
-            id: index.toString(),
-            time,
-          })) || [],
-        }}
+        initialSchedule={(() => {
+          const schedule = schedules.find(s => s.dayOfWeek.toString() === editingDay);
+          return schedule
+            ? {
+                day: schedule.dayOfWeek.toString(),
+                isOpen: schedule.availableTimeSlots.length > 0,
+                timeSlots: schedule.availableTimeSlots.map((time, idx) => ({ id: idx.toString(), time })),
+              }
+            : {
+                day: editingDay,
+                isOpen: false,
+                timeSlots: [],
+              };
+        })()}
       />
 
       <ServiceEditor
@@ -478,8 +479,8 @@ const AdminPanel = () => {
           setEditingService(null);
         }}
         onSave={handleSaveService}
-        initialService={editingService || undefined}
-        category={editingService?.category || 'barber'}
+        initialService={editingService ? { ...editingService, price: Number(editingService.price), description: editingService.description ? [editingService.description] : [] } : undefined}
+        category={'barber'}
       />
     </SafeAreaView>
   );

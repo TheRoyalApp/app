@@ -52,16 +52,6 @@ export default function TabLayout() {
 					tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
 				}}
 			/>
-			{user?.isAdmin && (
-				<Tabs.Screen
-					name="admin"
-					options={{
-						title: 'Admin',
-						headerShown: false,
-						tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
-					}}
-				/>
-			)}
 		</Tabs>
 	);
 }

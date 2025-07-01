@@ -45,6 +45,24 @@ export interface PaymentFilters {
   appointmentId?: string;
 }
 
+export interface CheckoutSessionData {
+  serviceId: string;
+  paymentType: 'full' | 'advance';
+  successUrl: string;
+  cancelUrl: string;
+  userId?: string;
+  appointmentData?: {
+    barberId: string;
+    appointmentDate: string;
+    timeSlot: string;
+    notes?: string;
+  };
+}
+
+export interface CheckoutResponse {
+  url: string;
+}
+
 // Payments Service
 export class PaymentsService {
   // Create a new payment
@@ -226,6 +244,18 @@ export class PaymentsService {
         return '#2196F3'; // Blue
       default:
         return '#9E9E9E'; // Gray
+    }
+  }
+
+  // Create Stripe checkout session for appointment booking
+  static async createCheckoutSession(data: CheckoutSessionData): Promise<ApiResponse<CheckoutResponse>> {
+    try {
+      return await apiClient.post<CheckoutResponse>('/payments/checkout', data);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create checkout session',
+      };
     }
   }
 } 

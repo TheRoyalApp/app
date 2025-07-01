@@ -116,6 +116,11 @@ export class AppointmentsService {
   // Update appointment
   static async updateAppointment(id: string, data: UpdateAppointmentData): Promise<ApiResponse<Appointment>> {
     try {
+      if (data.status) {
+        // Use the status-specific endpoint
+        return await apiClient.put<Appointment>(`/appointments/${id}/status`, { status: data.status });
+      }
+      // Fallback to generic update if needed
       return await apiClient.put<Appointment>(`/appointments/${id}`, data);
     } catch (error) {
       return {
@@ -196,6 +201,30 @@ export class AppointmentsService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch pending appointments',
+      };
+    }
+  }
+
+  // Get all appointments (admin only)
+  static async getAllAppointments(): Promise<ApiResponse<Appointment[]>> {
+    try {
+      return await apiClient.get<Appointment[]>('/appointments/all');
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch all appointments',
+      };
+    }
+  }
+
+  // Get all appointments for a specific barber (staff)
+  static async getBarberAppointments(barberId: string): Promise<ApiResponse<Appointment[]>> {
+    try {
+      return await apiClient.get<Appointment[]>(`/appointments/barber/${barberId}`);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch barber appointments',
       };
     }
   }

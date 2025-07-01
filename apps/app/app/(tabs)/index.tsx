@@ -1,17 +1,18 @@
 // React Native core imports
 import React from 'react';
-import { StatusBar, View, ScrollView, Alert } from 'react-native';
+import { StatusBar, View, ScrollView, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 // Third-party library imports
 import { Mail } from 'lucide-react-native';
-import { Link, router } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 
 // Local imports
 import { ThemeText, Container } from '@/components/Themed';
 import Button from '@/components/Button';
-import AppoinmentRemider from '@/components/ui/AppoinmentReminder';
+import AppointmentReminder from '@/components/ui/AppoinmentReminder';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/components/auth/AuthContext';
 import { AppointmentsService, Appointment } from '@/services';
@@ -20,23 +21,112 @@ export default function HomeScreen() {
 	const { user } = useAuth();
 	const [upcomingAppointment, setUpcomingAppointment] = useState<Appointment | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
+	const [response, setResponse] = useState<any>(null);
 
-	useEffect(() => {
-		fetchUpcomingAppointment();
-	}, []);
+	console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading);
+
+	useFocusEffect(
+		useCallback(() => {
+			console.log('🎯 useFocusEffect triggered - calling fetchUpcomingAppointment');
+			fetchUpcomingAppointment();
+		}, [])
+	);
 
 	const fetchUpcomingAppointment = async () => {
 		try {
 			setIsLoading(true);
-			const response = await AppointmentsService.getUpcomingAppointments();
+			console.log('🔄 Fetching appointments...');
+			console.log('👤 Current user:', user);
+			
+			if (!user) {
+				console.log('❌ No user authenticated - skipping API call');
+				setUpcomingAppointment(null);
+				setIsLoading(false);
+				return;
+			}
+			
+			const response = await AppointmentsService.getUserAppointments();
+			
+			console.log('📊 API Response:', {
+				success: response.success,
+				dataLength: response.data?.length || 0,
+				error: response.error,
+				rawData: response.data
+			});
 			
 			if (response.success && response.data && response.data.length > 0) {
+				console.log('📋 Raw API data structure:', response.data[0]);
+				console.log('📊 All appointments received:', response.data.length);
+				response.data.forEach((apt: any, index) => {
+					console.log(`📋 Appointment ${index + 1}:`, {
+						id: apt.id,
+						date: apt.appointmentDate,
+						time: apt.timeSlot,
+						status: apt.status,
+						service: apt.serviceName || apt.service?.name,
+						barber: apt.barberName || apt.barber?.name
+					});
+				});
+				
+				// Filter upcoming appointments (confirmed or pending status, and future dates)
+				const upcomingAppointments = response.data
+					.filter(appointment => {
+						// Only include confirmed or pending
+						if (!['confirmed', 'pending'].includes(appointment.status)) return false;
+
+						// Combine appointment date and time for accurate comparison
+						const appointmentDate = new Date(appointment.appointmentDate);
+						const [hours, minutes] = appointment.timeSlot.split(':');
+						appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+						
+						const now = new Date();
+
+						// Temporarily include appointments from today for testing
+						const today = new Date();
+						today.setHours(0, 0, 0, 0);
+						const appointmentDateOnly = new Date(appointmentDate);
+						appointmentDateOnly.setHours(0, 0, 0, 0);
+						
+						const isFuture = appointmentDate > now || appointmentDateOnly.getTime() === today.getTime();
+						if (!isFuture) {
+							console.log('❌ Filtered out - not future. Appointment:', {
+								id: appointment.id,
+								appointmentDateTime: appointmentDate.toString(),
+								now: now.toString(),
+								status: appointment.status,
+								rawDate: appointment.appointmentDate,
+								timeSlot: appointment.timeSlot,
+								combinedDateTime: appointmentDate.toString()
+							});
+						} else {
+							console.log('✅ Future appointment found:', {
+								id: appointment.id,
+								appointmentDateTime: appointmentDate.toString(),
+								now: now.toString(),
+								status: appointment.status,
+								timeSlot: appointment.timeSlot
+							});
+						}
+						return isFuture;
+					})
+					.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
+				
+				console.log('✅ Filtered upcoming appointments:', upcomingAppointments.length, upcomingAppointments);
+				
 				// Get the next upcoming appointment
-				const nextAppointment = response.data[0];
-				setUpcomingAppointment(nextAppointment);
+				if (upcomingAppointments.length > 0) {
+					console.log('🎯 Next appointment:', upcomingAppointments[0]);
+					setUpcomingAppointment(upcomingAppointments[0]);
+				} else {
+					console.log('❌ No upcoming appointments found');
+					setUpcomingAppointment(null);
+				}
 			} else {
+				console.log('❌ No appointments data or API failed');
 				setUpcomingAppointment(null);
 			}
+			setResponse(response);
 		} catch (error) {
 			console.error('Error fetching upcoming appointment:', error);
 			Alert.alert('Error', 'Failed to load appointment data');
@@ -44,6 +134,12 @@ export default function HomeScreen() {
 			setIsLoading(false);
 		}
 	};
+
+	const onRefresh = useCallback(async () => {
+		setRefreshing(true);
+		await fetchUpcomingAppointment();
+		setRefreshing(false);
+	}, []);
 
 	const formatTime = (timeSlot: string) => {
 		const [hours, minutes] = timeSlot.split(':');
@@ -54,20 +150,40 @@ export default function HomeScreen() {
 	};
 
 	const formatDate = (dateString: string) => {
-		const date = new Date(dateString);
-		return date.toLocaleDateString('es-ES', {
-			weekday: 'long',
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric',
-		});
+		// Handle dd/mm/yyyy format from API
+		if (dateString.includes('/')) {
+			const [day, month, year] = dateString.split('/');
+			const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+			return date.toLocaleDateString('es-ES', {
+				weekday: 'long',
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric',
+			});
+		} else {
+			// Fallback to standard date parsing
+			const date = new Date(dateString);
+			return date.toLocaleDateString('es-ES', {
+				weekday: 'long',
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric',
+			});
+		}
 	};
 
 	return (
-		<SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
-			<ScrollView>
-				<StatusBar barStyle="light-content" />
-
+		<ScreenWrapper showBottomFade={true} showTopFade={false}>
+			<ScrollView
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={Colors.dark.primary}
+						colors={[Colors.dark.primary]}
+					/>
+				}
+			>
 				<View
 					style={{
 						flexDirection: 'row',
@@ -87,7 +203,7 @@ export default function HomeScreen() {
 						<ThemeText
 							style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 5 }}
 						>
-							Hola, {user?.name || 'Usuario'}!
+							Hola, {user?.firstName || 'Usuario'}!
 						</ThemeText>
 						
 						{isLoading ? (
@@ -154,7 +270,7 @@ export default function HomeScreen() {
 						</Button>
 					</View>
 
-					<AppoinmentRemider />
+					<AppointmentReminder appointment={upcomingAppointment} />
 				</Container>
 
 				<View
@@ -215,8 +331,33 @@ export default function HomeScreen() {
 							→
 						</ThemeText>
 					</Link>
+
+					{/* Admin Panel link - only visible for admin/staff users */}
+					{user && (user.isAdmin === true || user.role === 'staff') && (
+						<Link
+							href="/admin"
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-between',
+								alignItems: 'center',
+								marginBottom: 15,
+								backgroundColor: Colors.dark.primary + '20',
+								padding: 10,
+								borderRadius: 8,
+								borderLeftWidth: 3,
+								borderLeftColor: Colors.dark.primary,
+							}}
+						>
+							<ThemeText style={{ fontSize: 16, color: Colors.dark.primary, fontWeight: '600' }}>
+								Panel de Administración{'  '}
+							</ThemeText>
+							<ThemeText style={{ fontSize: 20, color: Colors.dark.primary }}>
+								→
+							</ThemeText>
+						</Link>
+					)}
 				</View>
 			</ScrollView>
-		</SafeAreaView>
+		</ScreenWrapper>
 	);
 }

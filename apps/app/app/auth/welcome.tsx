@@ -6,16 +6,18 @@ import {
   StyleSheet,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/components/auth/AuthContext';
+import * as SecureStore from 'expo-secure-store';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
-  const router = useRouter();
   const { clearStorage, markWelcomeAsSeen } = useAuth();
 
   const handleLogin = async () => {
@@ -37,61 +39,53 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[Colors.dark.background, Colors.dark.tint]}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>The Royal Barber</Text>
-          <Text style={styles.subtitle}>
-            Tu barbería de confianza
-          </Text>
-        </View>
+    <ScreenWrapper>
+      <LinearGradient
+        colors={[Colors.dark.background, Colors.dark.tint]}
+        style={styles.container}
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.title}>The Royal Barber</Text>
+            <Text style={styles.subtitle}>
+              Tu barbería de confianza
+            </Text>
+          </View>
 
-        <View style={styles.imageContainer}>
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imageText}>✂️</Text>
+          <View style={styles.imageContainer}>
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imageText}>✂️</Text>
+            </View>
+          </View>
+
+          <View style={styles.description}>
+            <Text style={styles.descriptionText}>
+              Reserva tu cita de manera fácil y rápida. 
+              Disfruta de los mejores servicios de barbería.
+            </Text>
+            <Text style={styles.descriptionSubtext}>
+              Para continuar, inicia sesión o crea tu cuenta
+            </Text>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleSignUp}
+            >
+              <Text style={styles.primaryButtonText}>Crear Cuenta</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleLogin}
+            >
+              <Text style={styles.secondaryButtonText}>Ya tengo cuenta</Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.description}>
-          <Text style={styles.descriptionText}>
-            Reserva tu cita de manera fácil y rápida. 
-            Disfruta de los mejores servicios de barbería.
-          </Text>
-          <Text style={styles.descriptionSubtext}>
-            Para continuar, inicia sesión o crea tu cuenta
-          </Text>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleSignUp}
-          >
-            <Text style={styles.primaryButtonText}>Crear Cuenta</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleLogin}
-          >
-            <Text style={styles.secondaryButtonText}>Ya tengo cuenta</Text>
-          </TouchableOpacity>
-
-          {/* Botón para limpiar almacenamiento (solo para desarrollo) */}
-          {__DEV__ && (
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={handleClearStorage}
-            >
-              <Text style={styles.debugButtonText}>🔧 Limpiar Datos (Dev)</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+    </ScreenWrapper>
   );
 }
 
@@ -102,7 +96,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
     paddingBottom: 40,
     justifyContent: 'space-between',
   },

@@ -12,20 +12,23 @@ import {
 	Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Local imports
 import { ThemeText, Container } from '@/components/Themed';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/components/auth/AuthContext';
+import { AuthService } from '@/services';
 
 export default function ProfileScreen() {
-	const { user, signOut } = useAuth();
+	const { user, signOut, refreshUser } = useAuth();
 	const [isEditing, setIsEditing] = useState(false);
 	const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 	const [showLogoutModal, setShowLogoutModal] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
 	const [notificationSettings, setNotificationSettings] = useState({
 		pushNotifications: true,
 		emailNotifications: true,
@@ -35,35 +38,81 @@ export default function ProfileScreen() {
 	});
 
 	const [userData, setUserData] = useState({
-		firstName: user?.name?.split(' ')[0] || 'Usuario',
-		lastName: user?.name?.split(' ').slice(1).join(' ') || '',
-		email: user?.email || 'usuario@ejemplo.com',
-		phone: '+34 612 345 678',
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
 	});
 
-	const handleSave = () => {
-		// Here you would typically save to your backend
-		Alert.alert('Éxito', '¡Perfil actualizado correctamente!');
-		setIsEditing(false);
+	const [originalUserData, setOriginalUserData] = useState({
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
+	});
+
+	// Initialize user data from context
+	useEffect(() => {
+		if (user) {
+			const userDataFromContext = {
+				firstName: user.firstName || '',
+				lastName: user.lastName || '',
+				email: user.email || '',
+				phone: user.phone || '',
+			};
+			setUserData(userDataFromContext);
+			setOriginalUserData(userDataFromContext);
+		}
+	}, [user]);
+
+	const handleSave = async () => {
+		if (!user) return;
+		
+		try {
+			setIsLoading(true);
+			
+			// Call the update profile API
+			const response = await AuthService.updateProfile({
+				firstName: userData.firstName,
+				lastName: userData.lastName,
+				email: userData.email,
+				phone: userData.phone,
+			});
+
+			if (response.success) {
+				// Update the original data to the new saved data
+				setOriginalUserData(userData);
+				// Refresh user data in context
+				await refreshUser();
+				Alert.alert('Éxito', '¡Perfil actualizado correctamente!');
+				setIsEditing(false);
+			} else {
+				Alert.alert('Error', response.error || 'No se pudo actualizar el perfil');
+			}
+		} catch (error) {
+			console.error('Error updating profile:', error);
+			Alert.alert('Error', 'Ocurrió un error al actualizar el perfil');
+		} finally {
+			setIsLoading(false);
+		}
 	};
 
 	const handleCancel = () => {
 		// Reset to original data
-		setUserData({
-			firstName: user?.name?.split(' ')[0] || 'Usuario',
-			lastName: user?.name?.split(' ').slice(1).join(' ') || '',
-			email: user?.email || 'usuario@ejemplo.com',
-			phone: '+34 612 345 678',
-		});
+		setUserData(originalUserData);
 		setIsEditing(false);
 	};
 
 	const handleLogout = async () => {
 		try {
+			setIsLoading(true);
 			await signOut();
 			setShowLogoutModal(false);
 		} catch (error) {
+			console.error('Logout error:', error);
 			Alert.alert('Error', 'Ocurrió un error al cerrar sesión');
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -74,235 +123,227 @@ export default function ProfileScreen() {
 	};
 
 	return (
-		<SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
-			<MaskedView
-				style={{ flex: 1 }}
-				maskElement={
-					<LinearGradient
-						style={{ flex: 1 }}
-						colors={['black', 'black', 'transparent']}
-						locations={[0, 0.95, 1]}
-					/>
-				}
-			>
-				<ScrollView showsVerticalScrollIndicator={false}>
-					<Container>
-						{/* Header */}
-						<View style={styles.header}>
-							<View style={styles.headerContent}>
-								<ThemeText style={styles.headerTitle}>Mi Perfil</ThemeText>
-							</View>
-							{!isEditing ? (
+		<ScreenWrapper showBottomFade={true} showTopFade={false}>
+			<ScrollView showsVerticalScrollIndicator={false}>
+				<Container>
+					{/* Header */}
+					<View style={styles.header}>
+						<View style={styles.headerContent}>
+							<ThemeText style={styles.headerTitle}>Mi Perfil</ThemeText>
+						</View>
+						{!isEditing ? (
+							<TouchableOpacity
+								style={styles.editButton}
+								onPress={() => setIsEditing(true)}
+							>
+								<Ionicons name="pencil" size={20} color={Colors.dark.primary} />
+							</TouchableOpacity>
+						) : (
+							<View style={styles.editActions}>
 								<TouchableOpacity
-									style={styles.editButton}
-									onPress={() => setIsEditing(true)}
+									style={styles.actionButton}
+									onPress={handleCancel}
 								>
-									<Ionicons name="pencil" size={20} color={Colors.dark.primary} />
+									<ThemeText style={styles.cancelText}>Cancelar</ThemeText>
 								</TouchableOpacity>
-							) : (
-								<View style={styles.editActions}>
-									<TouchableOpacity
-										style={styles.actionButton}
-										onPress={handleCancel}
-									>
-										<ThemeText style={styles.cancelText}>Cancelar</ThemeText>
-									</TouchableOpacity>
-									<TouchableOpacity
-										style={[styles.actionButton, styles.saveButton]}
-										onPress={handleSave}
-									>
-										<ThemeText style={styles.saveText}>Guardar</ThemeText>
-									</TouchableOpacity>
-								</View>
-							)}
-						</View>
-
-						{/* Stats Card */}
-						<View style={styles.statsCard}>
-							<View style={styles.statsContent}>
-								<View style={styles.statIcon}>
-									<Ionicons
-										name="calendar"
-										size={24}
-										color={Colors.dark.primary}
-									/>
-								</View>
-								<View style={styles.statInfo}>
-									<ThemeText style={styles.statNumber}>12</ThemeText>
-									<ThemeText style={styles.statLabel}>Citas Totales</ThemeText>
-								</View>
+															<TouchableOpacity
+								style={[styles.actionButton, styles.saveButton, isLoading && styles.saveButtonDisabled]}
+								onPress={handleSave}
+								disabled={isLoading}
+							>
+								<ThemeText style={styles.saveText}>
+									{isLoading ? 'Guardando...' : 'Guardar'}
+								</ThemeText>
+							</TouchableOpacity>
 							</View>
-						</View>
+						)}
+					</View>
 
-						{/* Profile Information Card */}
-						<View style={styles.profileCard}>
-							<View style={styles.cardHeader}>
+					{/* Stats Card */}
+					<View style={styles.statsCard}>
+						<View style={styles.statsContent}>
+							<View style={styles.statIcon}>
 								<Ionicons
-									name="person-circle"
+									name="calendar"
 									size={24}
 									color={Colors.dark.primary}
 								/>
-								<ThemeText style={styles.cardTitle}>
-									Información Personal
+							</View>
+							<View style={styles.statInfo}>
+								<ThemeText style={styles.statNumber}>12</ThemeText>
+								<ThemeText style={styles.statLabel}>Citas Totales</ThemeText>
+							</View>
+						</View>
+					</View>
+
+					{/* Profile Information Card */}
+					<View style={styles.profileCard}>
+						<View style={styles.cardHeader}>
+							<Ionicons
+								name="person-circle"
+								size={24}
+								color={Colors.dark.primary}
+							/>
+							<ThemeText style={styles.cardTitle}>
+								Información Personal
+							</ThemeText>
+						</View>
+
+						<View style={styles.formSection}>
+							<View style={styles.inputGroup}>
+								<ThemeText style={styles.inputLabel}>Nombre</ThemeText>
+								{isEditing ? (
+									<TextInput
+										style={styles.textInput}
+										value={userData.firstName}
+										onChangeText={text =>
+											setUserData({ ...userData, firstName: text })
+										}
+										placeholderTextColor={Colors.dark.textLight}
+									/>
+								) : (
+									<View style={styles.displayContainer}>
+										<ThemeText style={styles.displayText}>
+											{userData.firstName}
+										</ThemeText>
+									</View>
+								)}
+							</View>
+
+							<View style={styles.inputGroup}>
+								<ThemeText style={styles.inputLabel}>Apellidos</ThemeText>
+								{isEditing ? (
+									<TextInput
+										style={styles.textInput}
+										value={userData.lastName}
+										onChangeText={text =>
+											setUserData({ ...userData, lastName: text })
+										}
+										placeholderTextColor={Colors.dark.textLight}
+									/>
+								) : (
+									<View style={styles.displayContainer}>
+										<ThemeText style={styles.displayText}>
+											{userData.lastName}
+										</ThemeText>
+									</View>
+								)}
+							</View>
+
+							<View style={styles.inputGroup}>
+								<ThemeText style={styles.inputLabel}>
+									Correo Electrónico
 								</ThemeText>
-							</View>
-
-							<View style={styles.formSection}>
-								<View style={styles.inputGroup}>
-									<ThemeText style={styles.inputLabel}>Nombre</ThemeText>
-									{isEditing ? (
-										<TextInput
-											style={styles.textInput}
-											value={userData.firstName}
-											onChangeText={text =>
-												setUserData({ ...userData, firstName: text })
-											}
-											placeholderTextColor={Colors.dark.textLight}
-										/>
-									) : (
-										<View style={styles.displayContainer}>
-											<ThemeText style={styles.displayText}>
-												{userData.firstName}
-											</ThemeText>
-										</View>
-									)}
-								</View>
-
-								<View style={styles.inputGroup}>
-									<ThemeText style={styles.inputLabel}>Apellidos</ThemeText>
-									{isEditing ? (
-										<TextInput
-											style={styles.textInput}
-											value={userData.lastName}
-											onChangeText={text =>
-												setUserData({ ...userData, lastName: text })
-											}
-											placeholderTextColor={Colors.dark.textLight}
-										/>
-									) : (
-										<View style={styles.displayContainer}>
-											<ThemeText style={styles.displayText}>
-												{userData.lastName}
-											</ThemeText>
-										</View>
-									)}
-								</View>
-
-								<View style={styles.inputGroup}>
-									<ThemeText style={styles.inputLabel}>
-										Correo Electrónico
-									</ThemeText>
-									{isEditing ? (
-										<TextInput
-											style={styles.textInput}
-											value={userData.email}
-											onChangeText={text =>
-												setUserData({ ...userData, email: text })
-											}
-											placeholderTextColor={Colors.dark.textLight}
-											keyboardType="email-address"
-										/>
-									) : (
-										<View style={styles.displayContainer}>
-											<ThemeText style={styles.displayText}>
-												{userData.email}
-											</ThemeText>
-										</View>
-									)}
-								</View>
-
-								<View style={styles.inputGroup}>
-									<ThemeText style={styles.inputLabel}>
-										Número de Teléfono
-									</ThemeText>
-									{isEditing ? (
-										<TextInput
-											style={styles.textInput}
-											value={userData.phone}
-											onChangeText={text =>
-												setUserData({ ...userData, phone: text })
-											}
-											placeholderTextColor={Colors.dark.textLight}
-											keyboardType="phone-pad"
-										/>
-									) : (
-										<View style={styles.displayContainer}>
-											<ThemeText style={styles.displayText}>
-												{userData.phone}
-											</ThemeText>
-										</View>
-									)}
-								</View>
-							</View>
-						</View>
-
-						{/* Settings Card */}
-						<View style={styles.settingsCard}>
-							<View style={styles.cardHeader}>
-								<Ionicons name="settings" size={24} color={Colors.dark.primary} />
-								<ThemeText style={styles.cardTitle}>Configuración</ThemeText>
-							</View>
-
-							<TouchableOpacity
-								style={styles.menuItem}
-								onPress={() => setShowNotificationsModal(true)}
-							>
-								<View style={styles.menuItemLeft}>
-									<View style={[styles.menuIcon, { backgroundColor: '#ffcc00' }]}>
-										<Ionicons
-											name="notifications-outline"
-											size={20}
-											color={Colors.dark.background}
-										/>
-									</View>
-									<View style={styles.menuText}>
-										<ThemeText style={styles.menuTitle}>Notificaciones</ThemeText>
-										<ThemeText style={styles.menuSubtitle}>
-											Gestionar preferencias de notificaciones
+								{isEditing ? (
+									<TextInput
+										style={styles.textInput}
+										value={userData.email}
+										onChangeText={text =>
+											setUserData({ ...userData, email: text })
+										}
+										placeholderTextColor={Colors.dark.textLight}
+										keyboardType="email-address"
+									/>
+								) : (
+									<View style={styles.displayContainer}>
+										<ThemeText style={styles.displayText}>
+											{userData.email}
 										</ThemeText>
 									</View>
-								</View>
-								<Ionicons
-									name="chevron-forward"
-									size={20}
-									color={Colors.dark.textLight}
-								/>
-							</TouchableOpacity>
+								)}
+							</View>
 
-							<TouchableOpacity
-								style={styles.menuItem}
-								onPress={() => setShowLogoutModal(true)}
-							>
-								<View style={styles.menuItemLeft}>
-									<View style={[styles.menuIcon, { backgroundColor: '#ff3b30' }]}>
-										<Ionicons
-											name="log-out-outline"
-											size={20}
-											color={Colors.dark.background}
-										/>
-									</View>
-									<View style={styles.menuText}>
-										<ThemeText style={styles.menuTitle}>Cerrar Sesión</ThemeText>
-										<ThemeText style={styles.menuSubtitle}>
-											Salir de tu cuenta
+							<View style={styles.inputGroup}>
+								<ThemeText style={styles.inputLabel}>
+									Número de Teléfono
+								</ThemeText>
+								{isEditing ? (
+									<TextInput
+										style={styles.textInput}
+										value={userData.phone}
+										onChangeText={text =>
+											setUserData({ ...userData, phone: text })
+										}
+										placeholderTextColor={Colors.dark.textLight}
+										keyboardType="phone-pad"
+									/>
+								) : (
+									<View style={styles.displayContainer}>
+										<ThemeText style={styles.displayText}>
+											{userData.phone}
 										</ThemeText>
 									</View>
-								</View>
-								<Ionicons
-									name="chevron-forward"
-									size={20}
-									color={Colors.dark.textLight}
-								/>
-							</TouchableOpacity>
+								)}
+							</View>
+						</View>
+					</View>
+
+					{/* Settings Card */}
+					<View style={styles.settingsCard}>
+						<View style={styles.cardHeader}>
+							<Ionicons name="settings" size={24} color={Colors.dark.primary} />
+							<ThemeText style={styles.cardTitle}>Configuración</ThemeText>
 						</View>
 
-						{/* App Version */}
-						<View style={styles.versionSection}>
-							<ThemeText style={styles.versionText}>Versión 1.0.0</ThemeText>
-						</View>
-					</Container>
-				</ScrollView>
-			</MaskedView>
+						<TouchableOpacity
+							style={styles.menuItem}
+							onPress={() => setShowNotificationsModal(true)}
+						>
+							<View style={styles.menuItemLeft}>
+								<View style={[styles.menuIcon, { backgroundColor: '#ffcc00' }]}>
+									<Ionicons
+										name="notifications-outline"
+										size={20}
+										color={Colors.dark.background}
+									/>
+								</View>
+								<View style={styles.menuText}>
+									<ThemeText style={styles.menuTitle}>Notificaciones</ThemeText>
+									<ThemeText style={styles.menuSubtitle}>
+										Gestionar preferencias de notificaciones
+									</ThemeText>
+								</View>
+							</View>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={Colors.dark.textLight}
+							/>
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={styles.menuItem}
+							onPress={() => setShowLogoutModal(true)}
+						>
+							<View style={styles.menuItemLeft}>
+								<View style={[styles.menuIcon, { backgroundColor: '#ff3b30' }]}>
+									<Ionicons
+										name="log-out-outline"
+										size={20}
+										color={Colors.dark.background}
+									/>
+								</View>
+								<View style={styles.menuText}>
+									<ThemeText style={styles.menuTitle}>Cerrar Sesión</ThemeText>
+									<ThemeText style={styles.menuSubtitle}>
+										Salir de tu cuenta
+									</ThemeText>
+								</View>
+							</View>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={Colors.dark.textLight}
+							/>
+						</TouchableOpacity>
+					</View>
+
+					{/* App Version */}
+					<View style={styles.versionSection}>
+						<ThemeText style={styles.versionText}>Versión 1.0.0</ThemeText>
+					</View>
+				</Container>
+			</ScrollView>
 
 			{/* Notifications Modal */}
 			<Modal
@@ -464,18 +505,19 @@ export default function ProfileScreen() {
 							</TouchableOpacity>
 
 							<TouchableOpacity
-								style={styles.logoutConfirmButton}
+								style={[styles.logoutConfirmButton, isLoading && styles.logoutButtonDisabled]}
 								onPress={handleLogout}
+								disabled={isLoading}
 							>
 								<ThemeText style={styles.logoutConfirmText}>
-									Cerrar Sesión
+									{isLoading ? 'Cerrando...' : 'Cerrar Sesión'}
 								</ThemeText>
 							</TouchableOpacity>
 						</View>
 					</View>
 				</View>
 			</Modal>
-		</SafeAreaView>
+		</ScreenWrapper>
 	);
 }
 
@@ -512,6 +554,9 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		backgroundColor: Colors.dark.primary,
+	},
+	saveButtonDisabled: {
+		opacity: 0.6,
 	},
 	cancelText: {
 		color: Colors.dark.textLight,
@@ -777,5 +822,8 @@ const styles = StyleSheet.create({
 		color: Colors.dark.background,
 		fontWeight: '500',
 		textAlign: 'center',
+	},
+	logoutButtonDisabled: {
+		opacity: 0.6,
 	},
 });

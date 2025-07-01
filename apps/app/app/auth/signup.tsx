@@ -11,9 +11,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '@/components/auth/AuthContext';
 import Colors from '@/constants/Colors';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 
 export default function SignUpScreen() {
   const [firstName, setFirstName] = useState('');
@@ -24,7 +25,6 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
-  const router = useRouter();
 
   const handleSignUp = async () => {
     if (!firstName || !lastName || !phone || !email || !password || !confirmPassword) {
@@ -73,136 +73,138 @@ export default function SignUpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <LinearGradient
-          colors={[Colors.dark.background, Colors.dark.tint]}
-          style={styles.gradient}
-        >
-          <View style={styles.content}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={navigateToWelcome}
-              >
-                <Text style={styles.backButtonText}>← Volver</Text>
-              </TouchableOpacity>
-              <Text style={styles.title}>The Royal Barber</Text>
-              <Text style={styles.subtitle}>Crea tu cuenta</Text>
+    <ScreenWrapper>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <LinearGradient
+            colors={[Colors.dark.background, Colors.dark.tint]}
+            style={styles.gradient}
+          >
+            <View style={styles.content}>
+              <View style={styles.header}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={navigateToWelcome}
+                >
+                  <Text style={styles.backButtonText}>← Volver</Text>
+                </TouchableOpacity>
+                <Text style={styles.title}>The Royal Barber</Text>
+                <Text style={styles.subtitle}>Crea tu cuenta</Text>
+              </View>
+
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Nombre</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    placeholder="Tu nombre"
+                    placeholderTextColor={Colors.dark.textLight}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Apellido</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={lastName}
+                    onChangeText={setLastName}
+                    placeholder="Tu apellido"
+                    placeholderTextColor={Colors.dark.textLight}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Teléfono</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="+1234567890"
+                    placeholderTextColor={Colors.dark.textLight}
+                    keyboardType="phone-pad"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Correo electrónico</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="tu@email.com"
+                    placeholderTextColor={Colors.dark.textLight}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Contraseña</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={Colors.dark.textLight}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Confirmar contraseña</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={Colors.dark.textLight}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleSignUp}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.buttonText}>
+                    {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>o</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={navigateToLogin}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    ¿Ya tienes cuenta? Inicia sesión
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Nombre</Text>
-                <TextInput
-                  style={styles.input}
-                  value={firstName}
-                  onChangeText={setFirstName}
-                  placeholder="Tu nombre"
-                  placeholderTextColor={Colors.dark.textLight}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Apellido</Text>
-                <TextInput
-                  style={styles.input}
-                  value={lastName}
-                  onChangeText={setLastName}
-                  placeholder="Tu apellido"
-                  placeholderTextColor={Colors.dark.textLight}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Teléfono</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="+1234567890"
-                  placeholderTextColor={Colors.dark.textLight}
-                  keyboardType="phone-pad"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Correo electrónico</Text>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="tu@email.com"
-                  placeholderTextColor={Colors.dark.textLight}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Contraseña</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={Colors.dark.textLight}
-                  secureTextEntry
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Confirmar contraseña</Text>
-                <TextInput
-                  style={styles.input}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={Colors.dark.textLight}
-                  secureTextEntry
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleSignUp}
-                disabled={isLoading}
-              >
-                <Text style={styles.buttonText}>
-                  {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>o</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={navigateToLogin}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  ¿Ya tienes cuenta? Inicia sesión
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </LinearGradient>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </LinearGradient>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenWrapper>
   );
 }
 
@@ -221,11 +223,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 40,
+    textAlign: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
-    paddingTop: 60
+    paddingBottom: 32,
   },
   title: {
     fontSize: 32,
@@ -301,9 +303,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   backButton: {
-    position: 'absolute',
-    top: 24,
-    left: 24,
+    position: 'relative',
+    bottom: 16,
+    left: 0,
   },
   backButtonText: {
     color: Colors.dark.primary,

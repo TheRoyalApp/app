@@ -34,7 +34,7 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
     initialService || {
       name: '',
       price: 0,
-      description: [''],
+      description: [],
     }
   );
   const [newDescription, setNewDescription] = useState('');
@@ -60,10 +60,13 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
   };
 
   const removeDescription = (index: number) => {
-    setService(prev => ({
-      ...prev,
-      description: prev.description.filter((_, i) => i !== index),
-    }));
+    setService(prev => {
+      const newDescriptions = prev.description.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        description: newDescriptions,
+      };
+    });
   };
 
   const handleSave = () => {
@@ -77,12 +80,19 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
       return;
     }
 
-    if (service.description.length === 0 || service.description[0].trim() === '') {
-      Alert.alert('Error', 'Debe haber al menos una descripción');
+    const validDescriptions = service.description.filter(desc => desc.trim() !== '');
+    if (validDescriptions.length === 0) {
+      Alert.alert('Error', 'Debe haber al menos una descripción válida');
       return;
     }
 
-    onSave(service);
+    // Crear servicio con solo las descripciones válidas
+    const serviceToSave = {
+      ...service,
+      description: validDescriptions
+    };
+
+    onSave(serviceToSave);
     onClose();
   };
 
@@ -195,17 +205,25 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
 
               <View style={styles.descriptionsContainer}>
                 <ThemeText style={styles.descriptionsTitle}>Descripciones Actuales</ThemeText>
-                {service.description.map((desc, index) => (
-                  <View key={index} style={styles.descriptionItem}>
-                    <ThemeText style={styles.descriptionText}>• {desc}</ThemeText>
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeDescription(index)}
-                    >
-                      <ThemeText style={styles.removeButtonText}>✕</ThemeText>
-                    </TouchableOpacity>
+                {service.description.length === 0 ? (
+                  <View style={styles.emptyDescriptions}>
+                    <ThemeText style={styles.emptyDescriptionsText}>
+                      No hay descripciones. Agrega al menos una descripción para continuar.
+                    </ThemeText>
                   </View>
-                ))}
+                ) : (
+                  service.description.map((desc, index) => (
+                    <View key={index} style={styles.descriptionItem}>
+                      <ThemeText style={styles.descriptionText}>• {desc}</ThemeText>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeDescription(index)}
+                      >
+                        <ThemeText style={styles.removeButtonText}>✕</ThemeText>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
               </View>
             </View>
           </Container>
@@ -344,6 +362,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
     color: Colors.dark.text,
+  },
+  emptyDescriptions: {
+    backgroundColor: Colors.dark.gray,
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.dark.textLight,
+    alignItems: 'center',
+  },
+  emptyDescriptionsText: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   descriptionItem: {
     flexDirection: 'row',

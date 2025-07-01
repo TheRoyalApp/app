@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Development
   development: {
-    baseURL: 'http://localhost:3001',
+    baseURL: 'http://192.168.1.200:3001',
   },
   
   // Production
@@ -47,6 +47,9 @@ export const API_ENDPOINTS = {
     cancel: (id: string) => `/appointments/${id}/status`,
     reschedule: (id: string) => `/appointments/${id}/reschedule`,
     delete: (id: string) => `/appointments/${id}`,
+    // Admin endpoints
+    getByStatus: (status: string) => `/appointments/${status}`,
+    updateStatus: (id: string) => `/appointments/${id}/status`,
   },
   
   // Services

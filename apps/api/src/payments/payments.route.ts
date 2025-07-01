@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getDatabase } from '../db/connection.js';
-import { services, payments, appointments } from '../db/schema.js';
+import { services, payments, appointments, users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { errorResponse, successResponse } from '../helpers/response.helper.js';
@@ -224,7 +224,7 @@ paymentsRoute.post('/checkout', async (c) => {
 
     // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'paypal'],
+      payment_method_types: ['card'],
       line_items: [
         {
           price: priceId,
@@ -280,6 +280,12 @@ paymentsRoute.post('/webhook', async (c) => {
       case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session;
         
+        console.log('Processing checkout.session.completed event:', {
+          sessionId: session.id,
+          amount: session.amount_total,
+          metadata: session.metadata
+        });
+        
         // Extract metadata
         const serviceId = session.metadata?.serviceId;
         const paymentType = session.metadata?.paymentType;
@@ -289,66 +295,109 @@ paymentsRoute.post('/webhook', async (c) => {
         const timeSlot = session.metadata?.timeSlot;
         const notes = session.metadata?.notes;
         
+        console.log('Extracted metadata:', {
+          serviceId,
+          paymentType,
+          userId,
+          barberId,
+          appointmentDate,
+          timeSlot,
+          notes
+        });
+        
         if (!serviceId || !paymentType) {
           console.error('Missing serviceId or paymentType in session metadata');
           return c.json(errorResponse(400, 'Invalid session metadata'), 400);
         }
 
-        try {
-          // 1. Create payment record
-          const db = await getDatabase();
-          const [payment] = await db.insert(payments).values({
-            amount: (session.amount_total || 0).toString(),
-            paymentMethod: 'stripe',
-            status: 'completed',
-            transactionId: session.id,
-          }).returning();
-
-          if (!payment) {
-            throw new Error('Failed to create payment record');
+        const db = await getDatabase();
+        
+        // Use a transaction to ensure both payment and appointment are created together
+        await db.transaction(async (tx) => {
+          // Validate user exists
+          const user = userId ? await tx.select().from(users).where(eq(users.id, userId)).limit(1) : null;
+          if (userId && (!user || user.length === 0)) {
+            throw new Error(`User not found: ${userId}`);
           }
 
-          console.log(`Payment created with ID: ${payment.id}`);
+          // Validate barber exists
+          const barber = await tx.select().from(users).where(eq(users.id, barberId!)).limit(1);
+          if (!barber || barber.length === 0) {
+            throw new Error(`Barber not found: ${barberId}`);
+          }
 
-          // 2. If appointment data is provided, create the appointment
-          if (barberId && appointmentDate && timeSlot && userId) {
-            // Convert dd/mm/yyyy to Date object
+          // Validate service exists
+          const service = await tx.select().from(services).where(eq(services.id, serviceId)).limit(1);
+          if (!service || service.length === 0) {
+            throw new Error(`Service not found: ${serviceId}`);
+          }
+
+          // Validate appointment date format
+          if (appointmentDate && timeSlot) {
+            const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+            if (!dateRegex.test(appointmentDate)) {
+              throw new Error(`Invalid appointment date format. Expected dd/mm/yyyy, got: ${appointmentDate}`);
+            }
+          }
+
+          // Create appointment first if appointment data is provided
+          let appointmentId: string | null = null;
+          if (barberId && appointmentDate && timeSlot) {
             const dateParts = appointmentDate.split('/');
             if (dateParts.length === 3) {
-              const [day, month, year] = dateParts;
+              const day = dateParts[0];
+              const month = dateParts[1];
+              const year = dateParts[2];
+              
               if (day && month && year) {
-                const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                const dayNum = parseInt(day);
+                const monthNum = parseInt(month);
+                const yearNum = parseInt(year);
                 
-                // Create appointment with confirmed status
-                const [appointment] = await db.insert(appointments).values({
-                  userId: userId as string,
-                  barberId: barberId as string,
-                  serviceId: serviceId as string,
-                  appointmentDate: targetDate,
-                  timeSlot: timeSlot as string,
-                  status: 'confirmed', // Automatically set to confirmed
-                  notes: notes || undefined,
-                }).returning();
+                if (!isNaN(dayNum) && !isNaN(monthNum) && !isNaN(yearNum)) {
+                  const appointmentDateObj = new Date(yearNum, monthNum - 1, dayNum);
+                  
+                  const appointmentData = {
+                    userId: userId || null,
+                    barberId,
+                    serviceId,
+                    appointmentDate: appointmentDateObj,
+                    timeSlot,
+                    status: 'confirmed',
+                    notes: notes || null
+                  };
 
-                if (appointment) {
-                  // 3. Update payment to link it to the appointment
-                  await db.update(payments)
-                    .set({ appointmentId: appointment.id })
-                    .where(eq(payments.id, payment.id));
-
-                  console.log(`Appointment created with ID: ${appointment.id} and status: confirmed`);
-                  console.log(`Payment ${payment.id} linked to appointment ${appointment.id}`);
+                  console.log('Creating appointment with data:', appointmentData);
+                  const [appointment] = await tx.insert(appointments).values(appointmentData).returning();
+                  if (appointment) {
+                    console.log('✅ Appointment created:', appointment.id);
+                    appointmentId = appointment.id;
+                  }
                 }
               }
             }
           }
 
-          console.log(`Payment completed for service ${serviceId} with ${paymentType} payment`);
-          
-        } catch (error) {
-          console.error('Error handling successful payment:', error);
-          // Don't return error here as Stripe will retry the webhook
-        }
+          // Create payment record
+          const paymentData = {
+            appointmentId,
+            amount: (session.amount_total || 0).toString(), // Convert to string for decimal
+            paymentMethod: 'stripe',
+            status: 'completed',
+            transactionId: session.id
+          };
+
+          console.log('Creating payment with data:', paymentData);
+          const [payment] = await tx.insert(payments).values(paymentData).returning();
+          if (!payment) {
+            throw new Error('Failed to create payment record');
+          }
+          console.log('✅ Payment created:', payment.id);
+
+          return { payment, appointment: appointmentId ? { id: appointmentId } : null };
+        });
+
+        console.log(`✅ Payment completed for service ${serviceId} with ${paymentType} payment`);
         
         break;
 
@@ -366,7 +415,14 @@ paymentsRoute.post('/webhook', async (c) => {
 
     return c.json(successResponse(200, { received: true }), 200);
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('❌ Error processing webhook:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      eventType: event?.type
+    });
+    
+    // Return error response so Stripe knows to retry
     return c.json(errorResponse(500, 'Webhook processing failed'), 500);
   }
 });
@@ -383,68 +439,132 @@ paymentsRoute.post('/test-webhook', async (c) => {
       return c.json(errorResponse(400, 'Missing required fields'), 400);
     }
 
+    console.log('Test webhook called with data:', {
+      sessionId,
+      serviceId,
+      paymentType,
+      userId,
+      barberId,
+      appointmentDate,
+      timeSlot,
+      notes,
+      amount
+    });
+
     const db = await getDatabase();
     
-    // 1. Create payment record
-    const [payment] = await db.insert(payments).values({
-      amount: (amount || 2500).toString(),
-      paymentMethod: 'stripe',
-      status: 'completed',
-      transactionId: sessionId,
-    }).returning();
+    // Use a transaction to ensure both payment and appointment are created together
+    const result = await db.transaction(async (tx) => {
+      // 1. Create payment record
+      const [payment] = await tx.insert(payments).values({
+        amount: (amount || 2500).toString(),
+        paymentMethod: 'stripe',
+        status: 'completed',
+        transactionId: sessionId,
+      }).returning();
 
-    if (!payment) {
-      throw new Error('Failed to create payment record');
-    }
-
-    console.log(`Payment created with ID: ${payment.id}`);
-
-    // 2. If appointment data is provided, create the appointment
-    if (barberId && appointmentDate && timeSlot && userId) {
-      // Convert dd/mm/yyyy to Date object
-      const dateParts = appointmentDate.split('/');
-      if (dateParts.length === 3) {
-        const [day, month, year] = dateParts;
-        if (day && month && year) {
-          const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-          
-          // Create appointment with confirmed status
-          const [appointment] = await db.insert(appointments).values({
-            userId: userId as string,
-            barberId: barberId as string,
-            serviceId: serviceId as string,
-            appointmentDate: targetDate,
-            timeSlot: timeSlot as string,
-            status: 'confirmed', // Automatically set to confirmed
-            notes: notes || undefined,
-          }).returning();
-
-          if (appointment) {
-            // 3. Update payment to link it to the appointment
-            await db.update(payments)
-              .set({ appointmentId: appointment.id })
-              .where(eq(payments.id, payment.id));
-
-            console.log(`Appointment created with ID: ${appointment.id} and status: confirmed`);
-            console.log(`Payment ${payment.id} linked to appointment ${appointment.id}`);
-            
-            return c.json(successResponse(200, {
-              payment,
-              appointment,
-              message: 'Payment and appointment created successfully with confirmed status'
-            }), 200);
-          }
-        }
+      if (!payment) {
+        throw new Error('Failed to create payment record');
       }
-    }
 
-    return c.json(successResponse(200, {
-      payment,
-      message: 'Payment created successfully'
-    }), 200);
+      console.log(`Payment created with ID: ${payment.id}`);
+
+      // 2. If appointment data is provided, create the appointment
+      if (barberId && appointmentDate && timeSlot && userId) {
+        console.log('Creating appointment with data:', {
+          userId,
+          barberId,
+          serviceId,
+          appointmentDate,
+          timeSlot,
+          notes
+        });
+        
+        // Validate that all required entities exist
+        const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (!user) {
+          throw new Error(`User not found: ${userId}`);
+        }
+        
+        const [barber] = await tx.select().from(users).where(eq(users.id, barberId)).limit(1);
+        if (!barber) {
+          throw new Error(`Barber not found: ${barberId}`);
+        }
+        
+        const [service] = await tx.select().from(services).where(eq(services.id, serviceId)).limit(1);
+        if (!service) {
+          throw new Error(`Service not found: ${serviceId}`);
+        }
+
+        // Convert dd/mm/yyyy to Date object
+        const dateParts = appointmentDate.split('/');
+        if (dateParts.length !== 3) {
+          throw new Error(`Invalid date format: ${appointmentDate}. Expected dd/mm/yyyy`);
+        }
+        
+        const [day, month, year] = dateParts;
+        if (!day || !month || !year) {
+          throw new Error(`Invalid date parts: day=${day}, month=${month}, year=${year}`);
+        }
+        
+        const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        
+        // Validate the date is valid
+        if (isNaN(targetDate.getTime())) {
+          throw new Error(`Invalid date: ${appointmentDate}`);
+        }
+        
+        console.log('Parsed appointment date:', targetDate);
+        
+        // Create appointment with confirmed status
+        const [appointment] = await tx.insert(appointments).values({
+          userId: userId as string,
+          barberId: barberId as string,
+          serviceId: serviceId as string,
+          appointmentDate: targetDate,
+          timeSlot: timeSlot as string,
+          status: 'confirmed', // Automatically set to confirmed
+          notes: notes || undefined,
+        }).returning();
+
+        if (!appointment) {
+          throw new Error('Failed to create appointment record');
+        }
+
+        // 3. Update payment to link it to the appointment
+        await tx.update(payments)
+          .set({ appointmentId: appointment.id })
+          .where(eq(payments.id, payment.id));
+
+        console.log(`✅ Appointment created successfully with ID: ${appointment.id} and status: confirmed`);
+        console.log(`✅ Payment ${payment.id} linked to appointment ${appointment.id}`);
+        
+        return { payment, appointment };
+      } else {
+        console.log('No appointment data provided, only payment created');
+        return { payment };
+      }
+    });
+
+    if (result.appointment) {
+      return c.json(successResponse(200, {
+        payment: result.payment,
+        appointment: result.appointment,
+        message: 'Payment and appointment created successfully with confirmed status'
+      }), 200);
+    } else {
+      return c.json(successResponse(200, {
+        payment: result.payment,
+        message: 'Payment created successfully'
+      }), 200);
+    }
     
   } catch (error) {
-    console.error('Error in test webhook:', error);
+    console.error('❌ Error in test webhook:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return c.json(errorResponse(500, 'Test webhook failed'), 500);
   }
 });
@@ -475,4 +595,6 @@ paymentsRoute.get('/session/:sessionId', async (c) => {
     console.error('Error retrieving session:', error);
     return c.json(errorResponse(500, 'Failed to retrieve session'), 500);
   }
-}); 
+});
+
+export default paymentsRoute; 

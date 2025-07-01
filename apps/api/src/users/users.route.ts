@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { getAllUsers, getUserById, updateUser, deleteUser } from './users.controller.js';
 import { createUser } from '../use-cases/create-user.js';
-import type { User } from './users.js';
+import type { User } from './users.d.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.middleware.js';
 
 const usersRouter = new Hono();
@@ -34,10 +34,81 @@ usersRouter.get('/profile', authMiddleware, async (c: Context) => {
     }
 });
 
+// Update current user profile
+usersRouter.put('/profile', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        const body = await c.req.json();
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { data, error } = await updateUser(user.id, body);
+
+        if (error) {
+            return c.json(errorResponse(400, error), 400);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        return c.json(errorResponse(500, 'Failed to update user profile'), 500);
+    }
+});
+
+// Get staff users (barbers) - Public endpoint for mobile app
+usersRouter.get('/staff', async (c: Context) => {
+    try {
+        const { data, error } = await getAllUsers('staff');
+
+        if (error) {
+            return c.json(errorResponse(404, 'No staff users found'), 404);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'No staff users found'), 404);
+        }
+
+        // Ensure data is an array (getAllUsers returns User[] but UserResponse.data can be User | User[])
+        const staffUsers = Array.isArray(data) ? data : [data];
+
+        if (staffUsers.length === 0) {
+            return c.json(errorResponse(404, 'No staff users found'), 404);
+        }
+
+        // Remove sensitive information before sending to client
+        const publicStaffData = staffUsers.map((user: User) => ({
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role
+        }));
+
+        return c.json(successResponse(200, publicStaffData), 200);
+    } catch (error) {
+        console.error('Error fetching staff users:', error);
+        return c.json(errorResponse(500, 'Failed to fetch staff users'), 500);
+    }
+});
+
 // Get all users
 usersRouter.get('/all', authMiddleware, adminMiddleware, async (c: Context) => {
     try {
-        const { data, error } = await getAllUsers();
+        // Get role query parameter
+        const role = c.req.query('role') as 'customer' | 'staff' | undefined;
+        
+        // Validate role if provided
+        if (role && !['customer', 'staff'].includes(role)) {
+            return c.json(errorResponse(400, 'Invalid role. Must be "customer" or "staff"'), 400);
+        }
+
+        const { data, error } = await getAllUsers(role);
 
         if (error) {
             return c.json(errorResponse(404, 'No users found'), 404);

@@ -11,16 +11,16 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '@/components/auth/AuthContext';
 import Colors from '@/constants/Colors';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
-  const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -52,84 +52,86 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <LinearGradient
-          colors={[Colors.dark.background, Colors.dark.tint]}
-          style={styles.gradient}
-        >
-          <View style={styles.content}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={navigateToWelcome}
-              >
-                <Text style={styles.backButtonText}>← Volver</Text>
-              </TouchableOpacity>
-              <Text style={styles.title}>The Royal Barber</Text>
-              <Text style={styles.subtitle}>Inicia sesión en tu cuenta</Text>
+    <ScreenWrapper>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <LinearGradient
+            colors={[Colors.dark.background, Colors.dark.tint]}
+            style={styles.gradient}
+          >
+            <View style={styles.content}>
+              <View style={styles.header}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={navigateToWelcome}
+                >
+                  <Text style={styles.backButtonText}>← Volver</Text>
+                </TouchableOpacity>
+                <Text style={styles.title}>The Royal Barber</Text>
+                <Text style={styles.subtitle}>Inicia sesión en tu cuenta</Text>
+              </View>
+
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Correo electrónico</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="tu@email.com"
+                    placeholderTextColor={Colors.dark.textLight}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Contraseña</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={Colors.dark.textLight}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.buttonText}>
+                    {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>o</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={navigateToSignUp}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    ¿No tienes cuenta? Regístrate
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Correo electrónico</Text>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="tu@email.com"
-                  placeholderTextColor={Colors.dark.textLight}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Contraseña</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={Colors.dark.textLight}
-                  secureTextEntry
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleLogin}
-                disabled={isLoading}
-              >
-                <Text style={styles.buttonText}>
-                  {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>o</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={navigateToSignUp}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  ¿No tienes cuenta? Regístrate
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </LinearGradient>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </LinearGradient>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenWrapper>
   );
 }
 
@@ -146,7 +148,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
     paddingBottom: 40,
   },
   header: {
@@ -228,9 +229,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   backButton: {
-    position: 'absolute',
-    top: 24,
-    left: 24,
+    position: 'relative',
+    bottom: 20,
+    left: 0,
   },
   backButtonText: {
     color: Colors.dark.primary,

@@ -37,5 +37,15 @@ export type {
   Payment, 
   CreatePaymentData, 
   PaymentIntent, 
-  PaymentFilters 
-} from './payments.service'; 
+  PaymentFilters,
+  CheckoutSessionData,
+  CheckoutResponse
+} from './payments.service';
+
+// Export admin service
+export { AdminService } from './admin.service';
+export type { 
+  AdminAppointment, 
+  AdminStats, 
+  AdminUser 
+} from './admin.service'; 

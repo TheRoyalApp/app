@@ -1,16 +1,32 @@
 import { getDatabase, users } from '../db/connection.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { User, UserResponse } from './users.d';
 
 
-export async function getAllUsers(): Promise<UserResponse> {
+export async function getAllUsers(role?: 'customer' | 'staff'): Promise<UserResponse> {
     const res: UserResponse = {
         data: null,
         error: null,
     };
 
     const db = await getDatabase();
-    const allUsers = await db.select().from(users);
+    
+    // Build query with optional role filter
+    let allUsers;
+    if (role === 'staff') {
+        // For staff role, exclude admin users (staff with isAdmin = true)
+        allUsers = await db.select().from(users).where(
+            and(
+                eq(users.role, role),
+                eq(users.isAdmin, false)
+            )
+        );
+    } else if (role) {
+        allUsers = await db.select().from(users).where(eq(users.role, role));
+    } else {
+        allUsers = await db.select().from(users);
+    }
+    
     res.data = allUsers as User[];
 
     return res;
