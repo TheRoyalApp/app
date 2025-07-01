@@ -19,5 +19,8 @@
   "private": true,
   "workspaces": [
     "apps/*"
-  ]
+  ],
+  "dependencies": {
+    "@react-native-picker/picker": "^2.11.1"
+  }
 }

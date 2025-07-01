@@ -2,6 +2,7 @@ export interface ServiceInterface {
 	name: string;
 	price: number;
 	description: string[];
+	duration: number;
 }
 
 export const haircuts = [
@@ -14,6 +15,7 @@ export const haircuts = [
 			'Lavado de cabello final (opcional)',
 			'Peinado y perfume',
 		],
+		duration: 30
 	},
 	{
 		name: 'Corte Royal',
@@ -24,6 +26,7 @@ export const haircuts = [
 			'Lavado de cabello al finalizar (opcional)',
 			'Peinado y perfume',
 		],
+		duration: 30
 	},
 	{
 		name: 'Corte Imperial',
@@ -38,6 +41,7 @@ export const haircuts = [
 			'Lavado de cabello al finalizar (opcional)',
 			'Peinado y perfume',
 		],
+		duration: 30
 	},
 	{
 		name: 'Limpieza Facial',
@@ -51,6 +55,7 @@ export const haircuts = [
 			'Vapor frío y mascarilla humectante',
 			'Crema hidratante',
 		],
+		duration: 30
 	},
 	{
 		name: 'Barba King',
@@ -65,6 +70,7 @@ export const haircuts = [
 			'Vapor frío y crema humectante',
 			'After shave y perfume',
 		],
+		duration: 30
 	},
 	{
 		name: 'Corte y Barba Royal',
@@ -78,6 +84,7 @@ export const haircuts = [
 			'After shave',
 			'Peinado y perfume',
 		],
+		duration: 30
 	},
 	{
 		name: 'Corte y Barba Imperial',
@@ -95,6 +102,7 @@ export const haircuts = [
 			'After shave',
 			'Peinado y perfume',
 		],
+		duration: 30
 	},
 ] as ServiceInterface[];
 
@@ -103,11 +111,13 @@ export const spa = [
 		name: 'Manicure',
 		price: 150,
 		description: ['Limpieza de manos y uñas en seco', 'Esmaltado transparente'],
+		duration: 30
 	},
 	{
 		name: 'Pedicure',
 		price: 200,
 		description: ['Limpieza de pies y uñas', 'Esmaltado transparente'],
+		duration: 30
 	},
 	{
 		name: 'Manicure Spa',
@@ -119,6 +129,7 @@ export const spa = [
 			'Mascarilla con aceites esenciales y relajantes',
 			'Gel semipermanente transparente',
 		],
+		duration: 30
 	},
 	{
 		name: 'Pedicure Spa',
@@ -131,10 +142,12 @@ export const spa = [
 			'Masaje relajante',
 			'Gel semipermanente transparente',
 		],
+		duration: 30
 	},
 	{
 		name: 'Combo del Rey',
 		price: 510,
 		description: ['Incluye Manicure y Pedicure Spa'],
+		duration: 30
 	},
 ] as ServiceInterface[];

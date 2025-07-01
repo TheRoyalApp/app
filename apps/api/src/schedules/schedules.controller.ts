@@ -201,7 +201,7 @@ export async function getAvailability(barberId: string, date: string) {
 // Get all schedules
 export async function getAllSchedules() {
   const res = {
-    data: null as Schedule[] | null,
+    data: null as any[] | null,
     error: null as string | null,
   };
 
@@ -209,11 +209,25 @@ export async function getAllSchedules() {
     const db = await getDatabase();
     
     const allSchedules = await db
-      .select()
+      .select({
+        id: schedules.id,
+        barberId: schedules.barberId,
+        dayOfWeek: schedules.dayOfWeek,
+        availableTimeSlots: schedules.availableTimeSlots,
+        isActive: schedules.isActive,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
+        barber: {
+          id: users.id,
+          name: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+          email: users.email,
+        }
+      })
       .from(schedules)
+      .leftJoin(users, eq(schedules.barberId, users.id))
       .orderBy(schedules.barberId, schedules.dayOfWeek);
 
-    res.data = allSchedules as Schedule[];
+    res.data = allSchedules;
     return res;
   } catch (error) {
     console.error('Error fetching all schedules:', error);

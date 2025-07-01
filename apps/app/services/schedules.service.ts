@@ -11,7 +11,7 @@ export interface TimeSlot {
 export interface BarberSchedule {
   id: string;
   barberId: string;
-  dayOfWeek: number; // 0-6 (Sunday-Saturday)
+  dayOfWeek: string; // 'sunday', 'monday', etc.
   availableTimeSlots: string[]; // Array of time strings
   createdAt: string;
   updatedAt: string;
@@ -44,7 +44,7 @@ export interface BackendAvailabilityResponse {
 
 export interface SetScheduleData {
   barberId: string;
-  dayOfWeek: number;
+  dayOfWeek: string;
   availableTimeSlots: string[];
 }
 

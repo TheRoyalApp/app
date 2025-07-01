@@ -34,6 +34,7 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
     initialService || {
       name: '',
       price: 0,
+      duration: 30,
       description: [],
     }
   );
@@ -80,7 +81,12 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
       return;
     }
 
-    const validDescriptions = service.description.filter(desc => desc.trim() !== '');
+    if (!service.duration || service.duration <= 0) {
+      Alert.alert('Error', 'La duración debe ser mayor a 0');
+      return;
+    }
+
+    const validDescriptions = service.description.filter(desc => typeof desc === 'string' && desc.trim() !== '');
     if (validDescriptions.length === 0) {
       Alert.alert('Error', 'Debe haber al menos una descripción válida');
       return;
@@ -169,6 +175,18 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
                   keyboardType="numeric"
                 />
               </View>
+
+              <View style={styles.inputGroup}>
+                <ThemeText style={styles.label}>Duración (minutos)</ThemeText>
+                <TextInput
+                  style={styles.textInput}
+                  value={service.duration?.toString() || ''}
+                  onChangeText={text => updateService('duration', parseInt(text.replace(/[^0-9]/g, '')) || 0)}
+                  placeholder="30"
+                  placeholderTextColor={Colors.dark.textLight}
+                  keyboardType="numeric"
+                />
+              </View>
             </View>
 
             <View style={styles.section}>
@@ -230,12 +248,8 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button secondary onPress={onClose} style={styles.cancelButton}>
-            Cancelar
-          </Button>
-          <Button onPress={handleSave} style={styles.saveButton}>
-            Guardar
-          </Button>
+          <Button onPress={handleSave} style={styles.saveButton}>Guardar</Button>
+          <Button secondary onPress={onClose} style={styles.cancelButton}>Cancelar</Button>
         </View>
       </SafeAreaView>
     </Modal>
@@ -406,17 +420,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   footer: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 15,
     borderTopWidth: 1,
     borderTopColor: Colors.dark.gray,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    gap: 16,
   },
   cancelButton: {
     flex: 1,
+    width: '100%',
+    height: 48,
+    borderRadius: 10,
+    marginRight: 8,
   },
   saveButton: {
-    flex: 1,
+    width: '100%',
+    height: 48,
+    borderRadius: 10,
   },
 });
 
