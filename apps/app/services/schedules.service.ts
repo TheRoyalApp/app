@@ -70,6 +70,7 @@ export class SchedulesService {
 
       if (response.success && response.data) {
         // Transform backend response to frontend format
+        // The backend already returns only available slots (not booked)
         const transformedResponse: AvailabilityResponse = {
           barberId: response.data.barberId,
           date: date, // Keep original format for frontend

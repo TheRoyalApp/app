@@ -9,6 +9,7 @@ export interface Appointment {
   appointmentDate: string;
   timeSlot: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
+  rescheduleCount?: number;
   createdAt: string;
   updatedAt: string;
   user?: {
@@ -104,7 +105,10 @@ export class AppointmentsService {
   // Get appointment by ID
   static async getAppointmentById(id: string): Promise<ApiResponse<Appointment>> {
     try {
-      return await apiClient.get<Appointment>(`/appointments/${id}`);
+      console.log('AppointmentsService.getAppointmentById: id', id);
+      const headers = (apiClient as any).getHeaders();
+      console.log('AppointmentsService.getAppointmentById: headers', headers);
+      return await apiClient.get<Appointment>(`/appointments/${id}`, true);
     } catch (error) {
       return {
         success: false,
@@ -145,10 +149,13 @@ export class AppointmentsService {
   // Reschedule appointment
   static async rescheduleAppointment(id: string, newDate: string, newTimeSlot: string): Promise<ApiResponse<Appointment>> {
     try {
+      console.log('AppointmentsService.rescheduleAppointment: id', id, 'newDate', newDate, 'newTimeSlot', newTimeSlot);
+      const headers = (apiClient as any).getHeaders();
+      console.log('AppointmentsService.rescheduleAppointment: headers', headers);
       return await apiClient.put<Appointment>(`/appointments/${id}/reschedule`, {
         appointmentDate: newDate,
         timeSlot: newTimeSlot,
-      });
+      }, true);
     } catch (error) {
       return {
         success: false,

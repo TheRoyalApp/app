@@ -67,10 +67,10 @@ export default function ProfileScreen() {
 
 	const handleSave = async () => {
 		if (!user) return;
-		
+
 		try {
 			setIsLoading(true);
-			
+
 			// Call the update profile API
 			const response = await AuthService.updateProfile({
 				firstName: userData.firstName,
@@ -146,35 +146,20 @@ export default function ProfileScreen() {
 								>
 									<ThemeText style={styles.cancelText}>Cancelar</ThemeText>
 								</TouchableOpacity>
-															<TouchableOpacity
-								style={[styles.actionButton, styles.saveButton, isLoading && styles.saveButtonDisabled]}
-								onPress={handleSave}
-								disabled={isLoading}
-							>
-								<ThemeText style={styles.saveText}>
-									{isLoading ? 'Guardando...' : 'Guardar'}
-								</ThemeText>
-							</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.actionButton, styles.saveButton, isLoading && styles.saveButtonDisabled]}
+									onPress={handleSave}
+									disabled={isLoading}
+								>
+									<ThemeText style={styles.saveText}>
+										{isLoading ? 'Guardando...' : 'Guardar'}
+									</ThemeText>
+								</TouchableOpacity>
 							</View>
 						)}
 					</View>
 
-					{/* Stats Card */}
-					<View style={styles.statsCard}>
-						<View style={styles.statsContent}>
-							<View style={styles.statIcon}>
-								<Ionicons
-									name="calendar"
-									size={24}
-									color={Colors.dark.primary}
-								/>
-							</View>
-							<View style={styles.statInfo}>
-								<ThemeText style={styles.statNumber}>12</ThemeText>
-								<ThemeText style={styles.statLabel}>Citas Totales</ThemeText>
-							</View>
-						</View>
-					</View>
+
 
 					{/* Profile Information Card */}
 					<View style={styles.profileCard}>

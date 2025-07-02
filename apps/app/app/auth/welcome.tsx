@@ -34,8 +34,8 @@ export default function WelcomeScreen() {
 
   const handleClearStorage = async () => {
     await clearStorage();
-    // Recargar la página para forzar la navegación
-    router.replace('/auth/welcome');
+    // This will redirect to welcome screen since no user is authenticated
+    console.log('Storage cleared - user will be redirected to welcome');
   };
 
   return (
@@ -81,6 +81,14 @@ export default function WelcomeScreen() {
               onPress={handleLogin}
             >
               <Text style={styles.secondaryButtonText}>Ya tengo cuenta</Text>
+            </TouchableOpacity>
+
+            {/* Debug button for iOS testing */}
+            <TouchableOpacity
+              style={styles.debugButton}
+              onPress={handleClearStorage}
+            >
+              <Text style={styles.debugButtonText}>🔧 Debug: Limpiar Almacenamiento</Text>
             </TouchableOpacity>
           </View>
         </View>

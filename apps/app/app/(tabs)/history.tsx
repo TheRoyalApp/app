@@ -16,11 +16,13 @@ import AppointmentCard from '@/components/services/AppointmentCard';
 import Colors from '@/constants/Colors';
 import { AppointmentsService, Appointment } from '@/services';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/components/auth/AuthContext';
 
 export default function HistoryScreen() {
 	const [appointments, setAppointments] = useState<Appointment[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const { user } = useAuth();
 
 	useEffect(() => {
 		loadAppointments();
@@ -50,23 +52,49 @@ export default function HistoryScreen() {
 		setRefreshing(false);
 	};
 
-	const handleCancelAppointment = async (appointmentId: string) => {
-		try {
-			const response = await AppointmentsService.cancelAppointment(appointmentId);
-			
-			if (response.success) {
-				Alert.alert('Success', 'Appointment cancelled successfully');
-				loadAppointments(); // Reload the list
-			} else {
-				Alert.alert('Error', response.error || 'Failed to cancel appointment');
-			}
-		} catch (error) {
-			console.error('Error cancelling appointment:', error);
-			Alert.alert('Error', 'Failed to cancel appointment');
-		}
+	const handleReschedule = (appointment: Appointment) => {
+		console.log('🔍 HISTORY RESCHEDULE DEBUG:', { 
+			appointmentId: appointment.id,
+			appointmentUserId: appointment.userId,
+			currentUserId: user?.id,
+			appointment,
+			user 
+		});
+		router.push(`/appointment/reschedule/${appointment.id}` as any);
 	};
 
-
+	const handleCancel = async (appointmentId: string) => {
+		Alert.alert(
+			'Cancelar Cita',
+			'¿Estás seguro de que quieres cancelar esta cita?',
+			[
+				{
+					text: 'No',
+					style: 'cancel',
+				},
+				{
+					text: 'Sí, Cancelar',
+					style: 'destructive',
+					onPress: async () => {
+						try {
+							const response = await AppointmentsService.cancelAppointment(appointmentId);
+							
+							if (response.success) {
+								Alert.alert('Éxito', 'Cita cancelada exitosamente');
+								// Reload appointments to reflect the change
+								loadAppointments();
+							} else {
+								Alert.alert('Error', response.error || 'No se pudo cancelar la cita');
+							}
+						} catch (error) {
+							console.error('Error canceling appointment:', error);
+							Alert.alert('Error', 'No se pudo cancelar la cita');
+						}
+					},
+				},
+			]
+		);
+	};
 
 	if (isLoading) {
 		return (
@@ -108,7 +136,7 @@ export default function HistoryScreen() {
 								No tienes citas agendadas
 							</ThemeText>
 							<Button
-								onPress={() => router.push('/appoinment')}
+								onPress={() => router.push('/appointment' as any)}
 								style={{ marginTop: 20 }}
 							>
 								Agendar Cita
@@ -128,7 +156,7 @@ export default function HistoryScreen() {
 											<AppointmentCard
 												key={appointment.id}
 												appointment={appointment}
-												onCancel={handleCancelAppointment}
+												onReschedule={handleReschedule}
 											/>
 										))}
 								</View>
@@ -146,7 +174,7 @@ export default function HistoryScreen() {
 											<AppointmentCard
 												key={appointment.id}
 												appointment={appointment}
-												onCancel={handleCancelAppointment}
+												onReschedule={handleReschedule}
 											/>
 										))}
 								</View>

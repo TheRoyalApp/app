@@ -48,7 +48,7 @@ export default function AppointmentReminder({ appointment }: AppointmentReminder
 		try {
 			// Handle different date formats
 			let date: Date;
-			
+
 			if (dateString.includes('/')) {
 				// Handle dd/mm/yyyy format
 				const [day, month, year] = dateString.split('/');
@@ -77,21 +77,21 @@ export default function AppointmentReminder({ appointment }: AppointmentReminder
 
 	// Get service name and price from either nested object or flat properties
 	const serviceName = appointment.service?.name || appointment.serviceName || 'Servicio';
-	const servicePrice = appointment.service?.price || appointment.servicePrice || 0;
+	const servicePrice = appointment.servicePrice
 	const barberName = appointment.barber?.name || appointment.barberName;
-
+	
 	return (
 		<View style={styles.container}>
-							{/* Gradient Background */}
+			{/* Gradient Background */}
 			<LinearGradient
 				colors={[Colors.dark.primary, '#f4d47a']}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
 				style={styles.gradientBackground}
 			/>
-				
-				{/* Content */}
-				<View style={styles.content}>
+
+			{/* Content */}
+			<View style={styles.content}>
 				{/* Header with Icon */}
 				<View style={styles.header}>
 					<View style={styles.iconContainer}>
@@ -112,7 +112,7 @@ export default function AppointmentReminder({ appointment }: AppointmentReminder
 						<View style={styles.serviceInfo}>
 							<ThemeText style={styles.serviceName}>{serviceName}</ThemeText>
 							<ThemeText style={styles.servicePrice}>
-								${typeof servicePrice === 'number' ? servicePrice.toFixed(2) : '0.00'}
+								${servicePrice ? (typeof servicePrice === 'number' ? servicePrice.toFixed(2) : parseFloat(servicePrice).toFixed(2)) : '0.00'}
 							</ThemeText>
 						</View>
 					</View>

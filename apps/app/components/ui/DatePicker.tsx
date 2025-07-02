@@ -1,10 +1,11 @@
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Alert, SafeAreaView } from "react-native"
 
 // You'll need to install: npm install react-native-calendars
 import { Calendar } from "react-native-calendars"
 import Colors from "@/constants/Colors"
 import Button from "@/components/Button"
+import { SchedulesService } from '@/services'
 
 // Generate available hours (9 AM to 5 PM)
 const availableHours = Array.from({ length: 9 }, (_, i) => {
@@ -18,6 +19,7 @@ const availableHours = Array.from({ length: 9 }, (_, i) => {
 })
 
 interface DatePickerProps {
+  barberId: string
   onDateSelect?: (date: string) => void
   onTimeSelect?: (time: string) => void
   onConfirm?: (date: string, time: string) => void
@@ -30,6 +32,7 @@ interface DatePickerProps {
 }
 
 export default function DatePicker({
+  barberId,
   onDateSelect,
   onTimeSelect,
   onConfirm,
@@ -44,12 +47,76 @@ export default function DatePicker({
   const [internalSelectedHour, setInternalSelectedHour] = useState<string>("")
   const [isCalendarVisible, setIsCalendarVisible] = useState(false)
   const [isTimePickerVisible, setIsTimePickerVisible] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false)
 
   // Use external state if provided, otherwise use internal state
   const selectedDate = externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate
   const selectedHour = externalSelectedTime !== undefined ? externalSelectedTime : internalSelectedHour
 
-  const today = new Date().toISOString().split("T")[0]
+  const today = new Date().toISOString().split("T")[0];
+
+  // Fetch available slots when date or barber changes
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (!barberId || !selectedDate) {
+        setAvailableSlots([])
+        return
+      }
+      setIsLoadingTimes(true)
+      try {
+        const response = await SchedulesService.getAvailability(barberId, selectedDate)
+        if (response.success && response.data) {
+          let slots = response.data.availableSlots.map(slot => slot.time)
+                    // Normalize dates to YYYY-MM-DD for comparison (no Date object, just string)
+          const normalizeDate = (dateStr: string) => {
+            if (!dateStr) return '';
+            // Accepts 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:mm:ss.sssZ'
+            if (dateStr.length >= 10) {
+              return dateStr.slice(0, 10);
+            }
+            return dateStr;
+          }
+          const now = new Date();
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const todayString = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+          const selectedString = normalizeDate(selectedDate);
+          // Debug log before filtering
+          console.log('[DatePicker] Pre-filter', { selectedDate, selectedString, todayString, slots });
+          if (!slots || slots.length === 0) {
+            console.warn('[DatePicker] No slots available before filtering', { slots });
+          }
+          // Always run filtering and logging for any selected date
+          const nowMinutes = now.getHours() * 60 + now.getMinutes();
+          const filteredSlots = slots.filter(time => {
+            let cleanTime = time.trim();
+            if (cleanTime.length === 8 && cleanTime[5] === ':') {
+              // Format is HH:mm:ss, convert to HH:mm
+              cleanTime = cleanTime.slice(0, 5);
+            }
+            const [hours, minutes] = cleanTime.split(':').map(Number);
+            const slotTimeInMinutes = hours * 60 + minutes;
+            // For today, filter out past slots; for other days, show all
+            const isToday = selectedString === todayString;
+            const keep = isToday ? slotTimeInMinutes > nowMinutes : true;
+            console.log('[DatePicker] Filtering slot:', { cleanTime, slotTimeInMinutes, nowMinutes, isToday, keep });
+            return keep;
+          });
+          if (filteredSlots.length === 0 && slots.length > 0) {
+            console.warn('[DatePicker] All slots filtered out for selected date. nowMinutes:', nowMinutes, 'slots:', slots)
+          }
+          setAvailableSlots(filteredSlots);
+        } else {
+          setAvailableSlots([])
+        }
+      } catch (error) {
+        setAvailableSlots([])
+      } finally {
+        setIsLoadingTimes(false)
+      }
+    }
+    fetchAvailability()
+  }, [barberId, selectedDate])
 
   const handleDateSelect = (day: any) => {
     const newDate = day.dateString
@@ -74,19 +141,21 @@ export default function DatePicker({
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "Seleccionar Fecha"
-    const date = new Date(dateString)
+    if (!dateString) return "Seleccionar Fecha";
+    // Parse manually to avoid timezone issues
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     return date.toLocaleDateString("es-ES", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
-    })
-  }
+    });
+  };
 
   const getSelectedTimeLabel = () => {
     if (!selectedHour) return "Seleccionar Hora"
-    return availableHours.find((h) => h.value === selectedHour)?.label || "Seleccionar Hora"
+    return selectedHour
   }
 
   const handleConfirm = () => {
@@ -94,10 +163,9 @@ export default function DatePicker({
       if (onConfirm) {
         onConfirm(selectedDate, selectedHour)
       } else {
-        const selectedTime = availableHours.find((h) => h.value === selectedHour)
         Alert.alert(
           "¡Cita Confirmada!",
-          `Tu cita está programada para ${formatDate(selectedDate)} a las ${selectedTime?.label}`,
+          `Tu cita está programada para ${formatDate(selectedDate)} a las ${selectedHour}`,
           [{ text: "OK" }],
         )
       }
@@ -133,9 +201,13 @@ export default function DatePicker({
           onPress={() => selectedDate && setIsTimePickerVisible(true)}
           style={styles.button}
           secondary={!selectedHour}
-          disabled={!selectedDate}
+          disabled={!selectedDate || isLoadingTimes}
         >
-          🕐 {getSelectedTimeLabel()}
+          {isLoadingTimes ? (
+            <>Cargando horarios...</>
+          ) : (
+            <>🕐 {getSelectedTimeLabel()}</>
+          )}
         </Button>
       </View>
 
@@ -211,17 +283,25 @@ export default function DatePicker({
             <View style={styles.modalSpacer} />
           </View>
           <ScrollView style={styles.timeList}>
-            {availableHours.map((hour) => (
-              <TouchableOpacity
-                key={hour.value}
-                style={[styles.timeItem, selectedHour === hour.value && styles.timeItemSelected]}
-                onPress={() => handleTimeSelect(hour.value)}
-              >
-                <Text style={[styles.timeItemText, selectedHour === hour.value && styles.timeItemTextSelected]}>
-                  {hour.label}
+            {availableSlots.length > 0 ? (
+              availableSlots.map((hour) => (
+                <TouchableOpacity
+                  key={hour}
+                  style={[styles.timeItem, selectedHour === hour && styles.timeItemSelected]}
+                  onPress={() => handleTimeSelect(hour)}
+                >
+                  <Text style={[styles.timeItemText, selectedHour === hour && styles.timeItemTextSelected]}>
+                    {hour}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.noTimesContainer}>
+                <Text style={styles.noTimesText}>
+                  No hay horarios disponibles para esta fecha
                 </Text>
-              </TouchableOpacity>
-            ))}
+              </View>
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -324,5 +404,14 @@ const styles = StyleSheet.create({
   timeItemTextSelected: {
     color: "#ffffff",
     fontWeight: "600",
+  },
+  noTimesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noTimesText: {
+    fontSize: 16,
+    color: Colors.dark.textLight,
   },
 })

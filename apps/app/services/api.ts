@@ -27,6 +27,9 @@ class ApiClient {
   // Initialize tokens from secure storage
   async initialize() {
     try {
+      console.log('API Client: Initializing...');
+      console.log('API Client: Base URL:', this.baseURL);
+      
       this.accessToken = await getItem('accessToken');
       this.refreshToken = await getItem('refreshToken');
       console.log('API Client initialized with tokens:', {
@@ -34,6 +37,18 @@ class ApiClient {
         hasRefreshToken: !!this.refreshToken,
         accessTokenLength: this.accessToken?.length || 0
       });
+      
+      // Test connectivity
+      try {
+        const testResponse = await fetch(`${this.baseURL}/health`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+        console.log('API Client: Connectivity test result:', testResponse.status);
+      } catch (error) {
+        console.warn('API Client: Connectivity test failed:', error);
+      }
     } catch (error) {
       console.error('Error initializing API client:', error);
     }
@@ -116,6 +131,11 @@ class ApiClient {
 
     try {
       const url = `${this.baseURL}${endpoint}`;
+      // Always reload the latest token before every request
+      if (includeAuth) {
+        this.accessToken = await getItem('accessToken');
+        this.refreshToken = await getItem('refreshToken');
+      }
       const headers = this.getHeaders(includeAuth);
 
       const response = await fetch(url, {

@@ -8,10 +8,11 @@ import { Appointment } from '@/services';
 interface AppointmentCardProps {
 	appointment: Appointment;
 	onCancel?: (appointmentId: string) => void;
+	onReschedule?: (appointment: Appointment) => void;
 	onPress?: (appointment: Appointment) => void;
 }
 
-export default function AppointmentCard({ appointment, onCancel, onPress }: AppointmentCardProps) {
+export default function AppointmentCard({ appointment, onCancel, onReschedule, onPress }: AppointmentCardProps) {
 	const formatTime = (timeSlot: string) => {
 		const [hours, minutes] = timeSlot.split(':');
 		const hour = parseInt(hours);
@@ -86,6 +87,8 @@ export default function AppointmentCard({ appointment, onCancel, onPress }: Appo
 	};
 
 	const canCancel = appointment.status === 'confirmed' || appointment.status === 'pending';
+	const canReschedule = (appointment.status === 'confirmed' || appointment.status === 'pending') && 
+		        (appointment.rescheduleCount || 0) < 1;
 
 	return (
 		<Pressable
@@ -134,18 +137,33 @@ export default function AppointmentCard({ appointment, onCancel, onPress }: Appo
 				</View>
 			</View>
 
-			{canCancel && onCancel && (
-				<Button
-					onPress={() => onCancel(appointment.id)}
-					style={{
-						backgroundColor: '#F44336',
-						borderColor: '#F44336',
-						marginTop: 10,
-					}}
-				>
-					Cancelar Cita
-				</Button>
-			)}
+			{/* Action Buttons */}
+			<View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+				{canReschedule && onReschedule && (
+					<Button
+						onPress={() => onReschedule(appointment)}
+						style={{
+							flex: 1,
+							backgroundColor: Colors.dark.primary,
+							borderColor: Colors.dark.primary,
+						}}
+					>
+						Reprogramar
+					</Button>
+				)}
+				{canCancel && onCancel && (
+					<Button
+						onPress={() => onCancel(appointment.id)}
+						style={{
+							flex: 1,
+							backgroundColor: '#F44336',
+							borderColor: '#F44336',
+						}}
+					>
+						Cancelar
+					</Button>
+				)}
+			</View>
 		</Pressable>
 	);
 } 

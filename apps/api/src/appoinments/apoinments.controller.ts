@@ -238,12 +238,14 @@ export async function getUserAppointments(userId: string) {
     const userAppointments = await db
       .select({
         id: appointments.id,
+        userId: appointments.userId,
         barberId: appointments.barberId,
         serviceId: appointments.serviceId,
         appointmentDate: appointments.appointmentDate,
         timeSlot: appointments.timeSlot,
         status: appointments.status,
         notes: appointments.notes,
+        rescheduleCount: appointments.rescheduleCount,
         createdAt: appointments.createdAt,
         updatedAt: appointments.updatedAt,
         barberName: users.firstName,
@@ -352,9 +354,9 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       return res;
     }
 
-    // Check reschedule limit (max 3 times)
-    if (existingAppointment[0] && existingAppointment[0].rescheduleCount >= 3) {
-      res.error = 'Maximum reschedule limit reached (3 times)';
+    // Check reschedule limit (max 1 time)
+    if (existingAppointment[0] && existingAppointment[0].rescheduleCount >= 1) {
+      res.error = 'Maximum reschedule limit reached (1 time)';
       return res;
     }
 
@@ -365,8 +367,19 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       return res;
     }
 
+    // Normalize time slot to 'HH:00' format
+    let normalizedTimeSlot = newTimeSlot;
+    if (/^\d{1,2}$/.test(newTimeSlot)) {
+      normalizedTimeSlot = (`${newTimeSlot.padStart(2, '0')}:00`) as TimeSlot;
+    }
+
     // Check if the new time slot is available
-    const isAvailable = await isTimeSlotAvailable(existingAppointment[0]?.barberId || '', newDate, newTimeSlot);
+    const isAvailable = await isTimeSlotAvailable(
+      existingAppointment[0]?.barberId || '',
+      newDate,
+      normalizedTimeSlot,
+      existingAppointment[0]?.id
+    );
     if (!isAvailable) {
       res.error = 'New time slot is not available';
       return res;
@@ -377,7 +390,7 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       .update(appointments)
       .set({
         appointmentDate: targetDate,
-        timeSlot: newTimeSlot,
+        timeSlot: normalizedTimeSlot as TimeSlot,
         rescheduleCount: (existingAppointment[0]?.rescheduleCount || 0) + 1,
         updatedAt: new Date()
       })

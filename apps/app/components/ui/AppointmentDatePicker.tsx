@@ -60,7 +60,7 @@ export default function AppointmentDatePicker({
         setAvailability(response.data)
         
         // Check if there are no available slots and show alert
-        const availableSlots = response.data.availableSlots?.filter(slot => slot.isAvailable && !slot.isBooked) || []
+        const availableSlots = response.data.availableSlots || []
         if (availableSlots.length === 0) {
           Alert.alert(
             'Sin horarios disponibles',
@@ -145,7 +145,39 @@ export default function AppointmentDatePicker({
 
   const getAvailableTimeSlots = (): TimeSlot[] => {
     if (!availability?.availableSlots) return []
-    return availability.availableSlots.filter(slot => slot.isAvailable && !slot.isBooked)
+    
+    let timeSlots: TimeSlot[] = []
+    
+    // If already objects, use as is
+    if (Array.isArray(availability.availableSlots) && typeof (availability.availableSlots[0] as any)?.time === 'string') {
+      timeSlots = availability.availableSlots as TimeSlot[];
+    } else {
+      // Otherwise, map strings to TimeSlot objects
+      timeSlots = (availability.availableSlots as unknown as string[]).map((slot) => ({
+        id: `${barberId}-${selectedDate}-${slot}`,
+        time: slot,
+        isAvailable: true,
+        isBooked: false,
+      }))
+    }
+    
+    // Filter out past hours for today only
+    const now = new Date()
+    const currentTime = now.getHours() * 60 + now.getMinutes() // Current time in minutes
+    
+    return timeSlots.filter((slot) => {
+      // For today's date, check if the time has passed
+      if (selectedDate === todayString) {
+        const [hours, minutes] = slot.time.split(':').map(Number)
+        const slotTimeInMinutes = hours * 60 + minutes
+        
+        // Only show slots that are at least 30 minutes in the future
+        return slotTimeInMinutes > currentTime + 30
+      }
+      
+      // For future dates, show all available slots (backend already filtered out booked ones)
+      return true
+    })
   }
 
   const handleConfirm = () => {

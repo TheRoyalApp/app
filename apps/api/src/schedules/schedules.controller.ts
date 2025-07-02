@@ -134,12 +134,17 @@ export async function getAvailability(barberId: string, date: string) {
     const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     const dayOfWeek = getDayOfWeek(targetDate);
 
+    // Debug logs
+    console.log('[getAvailability] targetDate:', targetDate, 'dayOfWeek:', dayOfWeek);
+
     // Get the barber's schedule for that day
     const schedule = await db
       .select()
       .from(schedules)
       .where(and(eq(schedules.barberId, barberId), eq(schedules.dayOfWeek, dayOfWeek)))
       .limit(1);
+
+    console.log('[getAvailability] schedule for', dayOfWeek, ':', schedule);
 
     if (schedule.length === 0) {
       const availability: ScheduleAvailability = {
@@ -189,6 +194,21 @@ export async function getAvailability(barberId: string, date: string) {
       bookedSlots
     };
 
+    // Normalize all slots to 'HH:MM' format
+    function normalizeSlot(slot: string) {
+      if (/^\d{1,2}$/.test(slot)) {
+        return (slot.padStart(2, '0') + ':00') as TimeSlot;
+      }
+      if (/^\d{1,2}:\d{1,2}$/.test(slot)) {
+        const [h, m] = slot.split(':');
+        if (!h || !m) return slot as TimeSlot;
+        return (h.padStart(2, '0') + ':' + m.padEnd(2, '0')) as TimeSlot;
+      }
+      return slot as TimeSlot;
+    }
+    availability.availableSlots = (availability.availableSlots || []).map(normalizeSlot) as TimeSlot[];
+    availability.bookedSlots = (availability.bookedSlots || []).map(normalizeSlot) as TimeSlot[];
+
     res.data = availability;
     return res;
   } catch (error) {
@@ -237,7 +257,7 @@ export async function getAllSchedules() {
 }
 
 // Check if a time slot is available for booking
-export async function isTimeSlotAvailable(barberId: string, date: string, timeSlot: TimeSlot): Promise<boolean> {
+export async function isTimeSlotAvailable(barberId: string, date: string, timeSlot: TimeSlot, excludeAppointmentId?: string): Promise<boolean> {
   try {
     const db = await getDatabase();
     
@@ -255,6 +275,12 @@ export async function isTimeSlotAvailable(barberId: string, date: string, timeSl
     const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     const dayOfWeek = getDayOfWeek(targetDate);
 
+    // Normalize timeSlot to 'HH:00' format
+    let normalizedTimeSlot = timeSlot;
+    if (/^\d{1,2}$/.test(timeSlot)) {
+      normalizedTimeSlot = (`${timeSlot.padStart(2, '0')}:00`) as TimeSlot;
+    }
+
     // Get the barber's schedule for that day
     const schedule = await db
       .select()
@@ -263,19 +289,22 @@ export async function isTimeSlotAvailable(barberId: string, date: string, timeSl
       .limit(1);
 
     if (schedule.length === 0) {
+      console.log('[isTimeSlotAvailable] No schedule for this day', { barberId, dayOfWeek });
       return false; // No schedule for this day
     }
 
     // Check if the time slot is in the available slots
     const availableSlots = schedule[0]?.availableTimeSlots || [];
-    if (!availableSlots.includes(timeSlot)) {
+    console.log('[isTimeSlotAvailable] Params', { barberId, date, timeSlot, normalizedTimeSlot });
+    console.log('[isTimeSlotAvailable] availableSlots', availableSlots);
+    if (!availableSlots.includes(normalizedTimeSlot)) {
+      console.log('[isTimeSlotAvailable] Slot not in availableSlots', { normalizedTimeSlot, availableSlots });
       return false; // Time slot not available in schedule
     }
 
     // Check if the time slot is already booked
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
-    
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
@@ -285,14 +314,15 @@ export async function isTimeSlotAvailable(barberId: string, date: string, timeSl
       .where(
         and(
           eq(appointments.barberId, barberId),
-          eq(appointments.timeSlot, timeSlot),
+          eq(appointments.timeSlot, normalizedTimeSlot),
           gte(appointments.appointmentDate, startOfDay),
           lte(appointments.appointmentDate, endOfDay),
-          sql`${appointments.status} != 'cancelled'`
+          sql`${appointments.status} != 'cancelled'`,
+          excludeAppointmentId ? sql`${appointments.id} != ${excludeAppointmentId}` : sql`1=1`
         )
       )
       .limit(1);
-
+    console.log('[isTimeSlotAvailable] existingAppointment', { normalizedTimeSlot, found: existingAppointment.length > 0, existingAppointment });
     return existingAppointment.length === 0; // Available if no existing appointment
   } catch (error) {
     console.error('Error checking time slot availability:', error);

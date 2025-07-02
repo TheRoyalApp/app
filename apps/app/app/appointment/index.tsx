@@ -32,7 +32,7 @@ interface Barber {
 	lastName: string;
 }
 
-export default function AppoinmentScreen() {
+export default function AppointmentScreen() {
 	const { user } = useAuth();
 	const [services, setServices] = useState<Service[]>([]);
 	const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -55,38 +55,49 @@ export default function AppoinmentScreen() {
 		const handleUrl = (url: string) => {
 			console.log('Received URL:', url);
 			
-			if (url.includes('app://payment/success')) {
+			if (url.includes('app://payment-callback')) {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
-				Alert.alert(
-					'¡Pago Exitoso!',
-					'Tu pago se ha procesado correctamente. Tu cita ha sido confirmada automáticamente.',
-					[
-						{
-							text: 'Ver Historial',
-							onPress: () => router.push('/(tabs)/history'),
-						},
-						{
-							text: 'Ir al Inicio',
-							onPress: () => router.push('/(tabs)'),
-						},
-					]
-				);
-			} else if (url.includes('app://payment/cancel')) {
-				// Close any open WebBrowser session
-				WebBrowser.dismissBrowser();
+				// Parse URL parameters
+				const urlObj = new URL(url);
+				const status = urlObj.searchParams.get('status');
+				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				Alert.alert(
-					'Pago Cancelado',
-					'El pago fue cancelado. Tu cita no ha sido reservada. Puedes intentar nuevamente.',
-					[
-						{
-							text: 'OK',
-							style: 'default',
-						},
-					]
-				);
+				if (status === 'success' && timeSlot) {
+					// Format the time for display
+					const formatTime = (time: string) => {
+						const [hours, minutes] = time.split(':');
+						const hour = parseInt(hours);
+						const ampm = hour >= 12 ? 'PM' : 'AM';
+						const displayHour = hour % 12 || 12;
+						return `${displayHour}:${minutes} ${ampm}`;
+					};
+					
+					const formattedTime = formatTime(timeSlot);
+					
+					Alert.alert(
+						'¡Pago Exitoso!',
+						`Te esperamos a las: ${formattedTime}`,
+						[
+							{
+								text: 'OK',
+								onPress: () => router.replace('/(tabs)'),
+							}
+						]
+					);
+				} else {
+					Alert.alert(
+						'Pago Fallido',
+						'El pago no se pudo procesar. Por favor, intenta nuevamente.',
+						[
+							{
+								text: 'OK',
+								onPress: () => router.replace('/(tabs)'),
+							}
+						]
+					);
+				}
 			}
 		};
 
@@ -225,8 +236,8 @@ export default function AppoinmentScreen() {
 			const checkoutData = {
 				serviceId: selectedService.id,
 				paymentType: paymentType,
-				successUrl: 'app://payment/success',
-				cancelUrl: 'app://payment/cancel',
+				successUrl: `app://payment-callback?status=success&timeSlot=${selectedTime}&appointmentDate=${formattedDate}`,
+				cancelUrl: `app://payment-callback?status=cancel&timeSlot=${selectedTime}&appointmentDate=${formattedDate}`,
 				userId: user.id,
 				appointmentData: {
 					barberId: selectedBarber.id,
@@ -265,99 +276,8 @@ export default function AppoinmentScreen() {
 						[{ text: 'OK', style: 'default' }]
 					);
 				} else if (result.type === 'dismiss') {
-					// User closed the browser - check if payment was successful
-					// Wait a moment for the webhook to process, then check for recent appointments
-					setTimeout(async () => {
-						try {
-							// Check if there are any recent appointments for this user
-							const appointmentsResponse = await AppointmentsService.getUserAppointments();
-							
-							if (appointmentsResponse.success && appointmentsResponse.data) {
-								const recentAppointments = appointmentsResponse.data.filter((apt: any) => {
-									// Handle dd/mm/yyyy format from API
-									let aptDate: Date;
-									if (apt.appointmentDate.includes('/')) {
-										const [day, month, year] = apt.appointmentDate.split('/');
-										aptDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-									} else {
-										aptDate = new Date(apt.appointmentDate);
-									}
-									const today = new Date();
-									return aptDate >= today;
-								});
-								
-								if (recentAppointments && recentAppointments.length > 0) {
-									// Payment was successful - appointment was created
-									Alert.alert(
-										'¡Pago Exitoso!',
-										'Tu pago se ha procesado correctamente. Tu cita ha sido confirmada automáticamente.',
-										[
-											{
-												text: 'Ver Historial',
-												onPress: () => router.push('/(tabs)/history'),
-											},
-											{
-												text: 'Ir al Inicio',
-												onPress: () => router.push('/(tabs)'),
-											},
-										]
-									);
-								} else {
-									// No recent appointments found - payment might have failed
-									Alert.alert(
-										'Verificando Pago',
-										'No se encontró una cita reciente. El pago podría estar procesándose o haber fallado.',
-										[
-											{
-												text: 'Ver Historial',
-												onPress: () => router.push('/(tabs)/history'),
-											},
-											{
-												text: 'Intentar Nuevamente',
-												onPress: () => handleBooking(),
-											},
-											{
-												text: 'OK',
-												style: 'default',
-											},
-										]
-									);
-								}
-							} else {
-								// Could not verify payment status
-								Alert.alert(
-									'Verificando Pago',
-									'No se pudo verificar el estado del pago. Revisa tu historial para confirmar.',
-									[
-										{
-											text: 'Ver Historial',
-											onPress: () => router.push('/(tabs)/history'),
-										},
-										{
-											text: 'OK',
-											style: 'default',
-										},
-									]
-								);
-							}
-						} catch (error) {
-							console.error('Error checking payment status:', error);
-							Alert.alert(
-								'Verificando Pago',
-								'No se pudo verificar el estado del pago. Revisa tu historial para confirmar.',
-								[
-									{
-										text: 'Ver Historial',
-										onPress: () => router.push('/(tabs)/history'),
-									},
-									{
-										text: 'OK',
-										style: 'default',
-									},
-								]
-							);
-						}
-					}, 2000); // Wait 2 seconds for webhook to process
+					// User closed the browser - payment callback will handle the result
+					console.log('Payment browser dismissed - callback will handle result');
 				}
 			} else {
 				Alert.alert('Error', response.error || 'Failed to create payment session');

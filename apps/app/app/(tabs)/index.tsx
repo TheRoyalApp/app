@@ -18,7 +18,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { AppointmentsService, Appointment } from '@/services';
 
 export default function HomeScreen() {
-	const { user } = useAuth();
+	const { user, clearStorage } = useAuth();
 	const [upcomingAppointment, setUpcomingAppointment] = useState<Appointment | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
@@ -38,23 +38,23 @@ export default function HomeScreen() {
 			setIsLoading(true);
 			console.log('🔄 Fetching appointments...');
 			console.log('👤 Current user:', user);
-			
+
 			if (!user) {
 				console.log('❌ No user authenticated - skipping API call');
 				setUpcomingAppointment(null);
 				setIsLoading(false);
 				return;
 			}
-			
+
 			const response = await AppointmentsService.getUserAppointments();
-			
+
 			console.log('📊 API Response:', {
 				success: response.success,
 				dataLength: response.data?.length || 0,
 				error: response.error,
 				rawData: response.data
 			});
-			
+
 			if (response.success && response.data && response.data.length > 0) {
 				console.log('📋 Raw API data structure:', response.data[0]);
 				console.log('📊 All appointments received:', response.data.length);
@@ -68,7 +68,7 @@ export default function HomeScreen() {
 						barber: apt.barberName || apt.barber?.name
 					});
 				});
-				
+
 				// Filter upcoming appointments (confirmed or pending status, and future dates)
 				const upcomingAppointments = response.data
 					.filter(appointment => {
@@ -79,7 +79,7 @@ export default function HomeScreen() {
 						const appointmentDate = new Date(appointment.appointmentDate);
 						const [hours, minutes] = appointment.timeSlot.split(':');
 						appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-						
+
 						const now = new Date();
 
 						// Temporarily include appointments from today for testing
@@ -87,7 +87,7 @@ export default function HomeScreen() {
 						today.setHours(0, 0, 0, 0);
 						const appointmentDateOnly = new Date(appointmentDate);
 						appointmentDateOnly.setHours(0, 0, 0, 0);
-						
+
 						const isFuture = appointmentDate > now || appointmentDateOnly.getTime() === today.getTime();
 						if (!isFuture) {
 							console.log('❌ Filtered out - not future. Appointment:', {
@@ -111,9 +111,9 @@ export default function HomeScreen() {
 						return isFuture;
 					})
 					.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
-				
+
 				console.log('✅ Filtered upcoming appointments:', upcomingAppointments.length, upcomingAppointments);
-				
+
 				// Get the next upcoming appointment
 				if (upcomingAppointments.length > 0) {
 					console.log('🎯 Next appointment:', upcomingAppointments[0]);
@@ -205,7 +205,7 @@ export default function HomeScreen() {
 						>
 							Hola, {user?.firstName || 'Usuario'}!
 						</ThemeText>
-						
+
 						{isLoading ? (
 							<ThemeText
 								style={{
@@ -262,10 +262,20 @@ export default function HomeScreen() {
 							marginBottom: 20,
 						}}
 					>
-						<Button onPress={() => router.push('/appoinment')}>
+						<Button onPress={() => router.push('/appointment')}>
 							Agendar cita
 						</Button>
-						<Button secondary onPress={() => router.push('/appoinment/reschedule')}>
+						<Button secondary onPress={() => {
+							if (upcomingAppointment) {
+								console.log('🔍 RESCHEDULE NAVIGATION DEBUG:', {
+									appointmentId: upcomingAppointment.id,
+									appointmentUserId: upcomingAppointment.userId,
+									currentUserId: user?.id,
+									appointment: upcomingAppointment
+								});
+								router.push(`/appointment/reschedule/${upcomingAppointment.id}`);
+							}
+						}}>
 							Reagendar
 						</Button>
 					</View>
@@ -356,6 +366,19 @@ export default function HomeScreen() {
 							</ThemeText>
 						</Link>
 					)}
+
+					{/* Debug button */}
+					<Button
+						secondary
+						onPress={async () => {
+							console.log('🔧 Debug: Clearing storage and redirecting to auth');
+							await clearStorage();
+							router.replace('/auth/welcome');
+						}}
+						style={{ marginTop: 20 }}
+					>
+						🔧 Debug: Ir a Auth
+					</Button>
 				</View>
 			</ScrollView>
 		</ScreenWrapper>
