@@ -118,10 +118,19 @@ export default function AppointmentScreen() {
 	const loadInitialData = async () => {
 		try {
 			setIsLoading(true);
-			await Promise.all([loadServices(), loadBarbers()]);
+			
+			// Add timeout to prevent infinite loading
+			const timeoutPromise = new Promise((_, reject) => {
+				setTimeout(() => reject(new Error('Loading timeout')), 10000);
+			});
+			
+			await Promise.race([
+				Promise.allSettled([loadServices(), loadBarbers()]),
+				timeoutPromise
+			]);
 		} catch (error) {
 			console.error('Error loading initial data:', error);
-			Alert.alert('Error', 'Failed to load data');
+			// Don't show alert, just set loading to false
 		} finally {
 			setIsLoading(false);
 		}
@@ -134,11 +143,10 @@ export default function AppointmentScreen() {
 			if (response.success && response.data) {
 				setServices(response.data);
 			} else {
-				Alert.alert('Error', 'Failed to load services');
+				console.error('Failed to load services:', response.error);
 			}
 		} catch (error) {
 			console.error('Error loading services:', error);
-			Alert.alert('Error', 'Failed to load services');
 		}
 	};
 
@@ -312,6 +320,28 @@ export default function AppointmentScreen() {
 				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 					<ActivityIndicator size="large" color={Colors.dark.primary} />
 					<ThemeText style={{ marginTop: 10 }}>Loading services...</ThemeText>
+				</View>
+			</ScreenWrapper>
+		);
+	}
+
+	// Show fallback when no data is available
+	if (services.length === 0 && barbers.length === 0) {
+		return (
+			<ScreenWrapper>
+				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+						No hay datos disponibles
+					</ThemeText>
+					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
+						No se pudieron cargar los servicios o barberos.
+					</ThemeText>
+					<Button onPress={() => loadInitialData()} style={{ marginBottom: 10 }}>
+						Reintentar
+					</Button>
+					<Button secondary onPress={() => router.back()}>
+						Volver
+					</Button>
 				</View>
 			</ScreenWrapper>
 		);
