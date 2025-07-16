@@ -135,11 +135,12 @@ const AdminPanel = () => {
     setRefreshing(true);
     // Appointments
     if (activeTab === 'appointments') {
-      // Both admin and staff fetch all appointments
+      // Both admin and staff fetch all non-closed appointments
       const res = await AppointmentsService.getAllAppointments();
       console.log('Fetched appointments:', res);
       if (res && res.success && res.data) {
-        // Filter out completed appointments
+        // Filter to show only non-closed appointments (pending, confirmed, cancelled)
+        // Exclude completed appointments as they are considered "closed"
         setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
       } else setAppointments([]);
     }

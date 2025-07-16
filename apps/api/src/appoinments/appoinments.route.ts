@@ -194,6 +194,26 @@ appointmentsRouter.get('/barber/:barberId', authMiddleware, staffOrAdminMiddlewa
     }
 });
 
+// Get all appointments (staff/admin only)
+appointmentsRouter.get('/all', authMiddleware, staffOrAdminMiddleware, async (c: Context) => {
+    try {
+        const { data, error } = await getAppointmentsByStatus('all');
+
+        if (error) {
+            return c.json(errorResponse(500, error), 500);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'No appointments found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error fetching all appointments:', error);
+        return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+});
+
 // Get appointment by ID (user can only access their own appointments, admin can access any)
 appointmentsRouter.get('/:id', authMiddleware, async (c: Context) => {
     try {
