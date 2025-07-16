@@ -21,6 +21,7 @@ export function useApi<T = any>(
     showErrorAlert?: boolean;
     onSuccess?: (data: T) => void;
     onError?: (error: string) => void;
+    errorMessages?: Record<string, string>;
   } = {}
 ): UseApiReturn<T> {
   const [state, setState] = useState<UseApiState<T>>({
@@ -29,7 +30,7 @@ export function useApi<T = any>(
     error: null,
   });
 
-  const { showErrorAlert = true, onSuccess, onError } = options;
+  const { showErrorAlert = true, onSuccess, onError, errorMessages = {} } = options;
 
   const execute = useCallback(
     async (...args: any[]): Promise<T | null> => {
@@ -43,7 +44,8 @@ export function useApi<T = any>(
           onSuccess?.(response.data);
           return response.data;
         } else {
-          const errorMessage = response.error || 'Operation failed';
+          // Use custom error message if available
+          const errorMessage = errorMessages[response.error || ''] || response.error || 'Operation failed';
           setState(prev => ({ ...prev, error: errorMessage, loading: false }));
           
           if (showErrorAlert) {
@@ -54,7 +56,19 @@ export function useApi<T = any>(
           return null;
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        let errorMessage = 'An unexpected error occurred';
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        
+        // Handle network errors specifically
+        if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+          errorMessage = 'No internet connection. Please check your network and try again.';
+        }
+        
         setState(prev => ({ ...prev, error: errorMessage, loading: false }));
         
         if (showErrorAlert) {
@@ -65,7 +79,7 @@ export function useApi<T = any>(
         return null;
       }
     },
-    [apiCall, showErrorAlert, onSuccess, onError]
+    [apiCall, showErrorAlert, onSuccess, onError, errorMessages]
   );
 
   const reset = useCallback(() => {

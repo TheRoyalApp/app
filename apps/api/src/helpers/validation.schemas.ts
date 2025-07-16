@@ -2,12 +2,21 @@ import { z } from 'zod';
 import { formatPhoneForTwilio } from './phone.helper.js';
 
 // Base schemas
-export const emailSchema = z.string().email('Invalid email format');
-export const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+export const emailSchema = z.string()
+  .email('Invalid email format')
+  .min(1, 'Email is required')
+  .max(255, 'Email too long')
+  .toLowerCase();
+
+export const passwordSchema = z.string()
+  .min(6, 'Password must be at least 6 characters')
+  .max(128, 'Password too long')
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one lowercase letter, one uppercase letter, and one number');
 
 // Phone schema with Twilio compatibility
 export const phoneSchema = z.string()
   .min(1, 'Phone number is required')
+  .max(20, 'Phone number too long')
   .transform((val) => {
     const result = formatPhoneForTwilio(val);
     if (!result.isValid) {
@@ -26,8 +35,14 @@ export const phoneSchema = z.string()
 export const createUserSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
-  firstName: z.string().min(1, 'First name is required').max(50, 'First name too long'),
-  lastName: z.string().min(1, 'Last name is required').max(50, 'Last name too long'),
+  firstName: z.string()
+    .min(1, 'First name is required')
+    .max(50, 'First name too long')
+    .regex(/^[a-zA-Z\s]+$/, 'First name can only contain letters and spaces'),
+  lastName: z.string()
+    .min(1, 'Last name is required')
+    .max(50, 'Last name too long')
+    .regex(/^[a-zA-Z\s]+$/, 'Last name can only contain letters and spaces'),
   phone: phoneSchema,
   role: z.enum(['customer', 'staff', 'admin'], {
     errorMap: () => ({ message: 'Role must be customer, staff, or admin' })
@@ -45,10 +60,22 @@ export const refreshTokenSchema = z.object({
 
 // Service schemas
 export const createServiceSchema = z.object({
-  name: z.string().min(1, 'Service name is required').max(100, 'Service name too long'),
-  description: z.string().max(500, 'Description too long').optional(),
-  price: z.number().positive('Price must be positive').max(10000, 'Price too high'),
-  duration: z.number().int().positive('Duration must be a positive integer').max(480, 'Duration too long (max 8 hours)')
+  name: z.string()
+    .min(1, 'Service name is required')
+    .max(100, 'Service name too long')
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Service name can only contain letters, numbers, spaces, hyphens, and underscores'),
+  description: z.string()
+    .max(500, 'Description too long')
+    .optional(),
+  price: z.number()
+    .positive('Price must be positive')
+    .max(10000, 'Price too high')
+    .multipleOf(0.01, 'Price must have at most 2 decimal places'),
+  duration: z.number()
+    .int('Duration must be a whole number')
+    .positive('Duration must be positive')
+    .max(480, 'Duration too long (max 8 hours)')
+    .min(15, 'Duration too short (min 15 minutes)')
 });
 
 // Schedule schemas

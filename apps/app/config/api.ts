@@ -5,9 +5,9 @@ export const API_CONFIG = {
     baseURL: 'http://localhost:3001',
   },
   
-  // Production
+  // Production - UPDATE THIS WITH YOUR ACTUAL PRODUCTION URL
   production: {
-    baseURL: 'https://your-api-domain.com', // Replace with your actual production API URL
+    baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.theroyalbarber.com',
   },
   
   // Get current environment

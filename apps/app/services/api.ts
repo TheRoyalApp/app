@@ -27,16 +27,21 @@ class ApiClient {
   // Initialize tokens from secure storage
   async initialize() {
     try {
-      console.log('API Client: Initializing...');
-      console.log('API Client: Base URL:', this.baseURL);
+      if (__DEV__) {
+        console.log('API Client: Initializing...');
+        console.log('API Client: Base URL:', this.baseURL);
+      }
       
       this.accessToken = await getItem('accessToken');
       this.refreshToken = await getItem('refreshToken');
-      console.log('API Client initialized with tokens:', {
-        hasAccessToken: !!this.accessToken,
-        hasRefreshToken: !!this.refreshToken,
-        accessTokenLength: this.accessToken?.length || 0
-      });
+      
+      if (__DEV__) {
+        console.log('API Client initialized with tokens:', {
+          hasAccessToken: !!this.accessToken,
+          hasRefreshToken: !!this.refreshToken,
+          accessTokenLength: this.accessToken?.length || 0
+        });
+      }
       
       // Test connectivity
       try {
@@ -45,12 +50,18 @@ class ApiClient {
           headers: { 'Content-Type': 'application/json' },
           signal: AbortSignal.timeout(5000) // 5 second timeout
         });
-        console.log('API Client: Connectivity test result:', testResponse.status);
+        if (__DEV__) {
+          console.log('API Client: Connectivity test result:', testResponse.status);
+        }
       } catch (error) {
-        console.warn('API Client: Connectivity test failed:', error);
+        if (__DEV__) {
+          console.warn('API Client: Connectivity test failed:', error);
+        }
       }
     } catch (error) {
-      console.error('Error initializing API client:', error);
+      if (__DEV__) {
+        console.error('Error initializing API client:', error);
+      }
     }
   }
 
@@ -59,18 +70,24 @@ class ApiClient {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     
-    console.log('Setting tokens:', {
-      accessTokenSet: !!accessToken,
-      refreshTokenSet: !!refreshToken,
-      accessTokenLength: accessToken?.length || 0
-    });
+    if (__DEV__) {
+      console.log('Setting tokens:', {
+        accessTokenSet: !!accessToken,
+        refreshTokenSet: !!refreshToken,
+        accessTokenLength: accessToken?.length || 0
+      });
+    }
     
     try {
       await setItem('accessToken', accessToken);
       await setItem('refreshToken', refreshToken);
-      console.log('Tokens stored successfully in secure storage');
+      if (__DEV__) {
+        console.log('Tokens stored successfully in secure storage');
+      }
     } catch (error) {
-      console.error('Error storing tokens:', error);
+      if (__DEV__) {
+        console.error('Error storing tokens:', error);
+      }
     }
   }
 
@@ -83,7 +100,9 @@ class ApiClient {
       await deleteItem('accessToken');
       await deleteItem('refreshToken');
     } catch (error) {
-      console.error('Error clearing tokens:', error);
+      if (__DEV__) {
+        console.error('Error clearing tokens:', error);
+      }
     }
   }
 
@@ -96,9 +115,13 @@ class ApiClient {
 
     if (includeAuth && this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
-      console.log('Including auth token in headers (length:', this.accessToken.length, ')');
+      if (__DEV__) {
+        console.log('Including auth token in headers (length:', this.accessToken.length, ')');
+      }
     } else if (includeAuth) {
-      console.log('Auth requested but no token available');
+      if (__DEV__) {
+        console.log('Auth requested but no token available');
+      }
     }
 
     return headers;
@@ -184,7 +207,9 @@ class ApiClient {
         }
       }
       
-      console.error('API request error:', error);
+      if (__DEV__) {
+        console.error('API request error:', error);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network error',
@@ -219,7 +244,9 @@ class ApiClient {
 
       return { success: true, data: tokens };
     } catch (error) {
-      console.error('Token refresh error:', error);
+      if (__DEV__) {
+        console.error('Token refresh error:', error);
+      }
       await this.clearTokens();
       return { success: false, error: 'Token refresh failed' };
     }

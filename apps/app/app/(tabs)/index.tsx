@@ -22,11 +22,15 @@ export default function HomeScreen() {
 	const [refreshing, setRefreshing] = useState(false);
 	const [response, setResponse] = useState<any>(null);
 
-	console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading);
+	if (__DEV__) {
+		console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading);
+	}
 
 	useFocusEffect(
 		useCallback(() => {
-			console.log('🎯 useFocusEffect triggered - calling fetchUpcomingAppointment');
+			if (__DEV__) {
+				console.log('🎯 useFocusEffect triggered - calling fetchUpcomingAppointment');
+			}
 			fetchUpcomingAppointment();
 		}, [])
 	);
@@ -34,11 +38,15 @@ export default function HomeScreen() {
 	const fetchUpcomingAppointment = async () => {
 		try {
 			setIsLoading(true);
-			console.log('🔄 Fetching appointments...');
-			console.log('👤 Current user:', user);
+			if (__DEV__) {
+				console.log('🔄 Fetching appointments...');
+				console.log('👤 Current user:', user);
+			}
 
 			if (!user) {
-				console.log('❌ No user authenticated - skipping API call');
+				if (__DEV__) {
+					console.log('❌ No user authenticated - skipping API call');
+				}
 				setUpcomingAppointment(null);
 				setIsLoading(false);
 				return;
@@ -46,26 +54,30 @@ export default function HomeScreen() {
 
 			const response = await AppointmentsService.getUserAppointments();
 
-			console.log('📊 API Response:', {
-				success: response.success,
-				dataLength: response.data?.length || 0,
-				error: response.error,
-				rawData: response.data
-			});
+			if (__DEV__) {
+				console.log('📊 API Response:', {
+					success: response.success,
+					dataLength: response.data?.length || 0,
+					error: response.error,
+					rawData: response.data
+				});
+			}
 
 			if (response.success && response.data && response.data.length > 0) {
-				console.log('📋 Raw API data structure:', response.data[0]);
-				console.log('📊 All appointments received:', response.data.length);
-				response.data.forEach((apt: any, index) => {
-					console.log(`📋 Appointment ${index + 1}:`, {
-						id: apt.id,
-						date: apt.appointmentDate,
-						time: apt.timeSlot,
-						status: apt.status,
-						service: apt.serviceName || apt.service?.name,
-						barber: apt.barberName || apt.barber?.name
+				if (__DEV__) {
+					console.log('📋 Raw API data structure:', response.data[0]);
+					console.log('📊 All appointments received:', response.data.length);
+					response.data.forEach((apt: any, index) => {
+						console.log(`📋 Appointment ${index + 1}:`, {
+							id: apt.id,
+							date: apt.appointmentDate,
+							time: apt.timeSlot,
+							status: apt.status,
+							service: apt.serviceName || apt.service?.name,
+							barber: apt.barberName || apt.barber?.name
+						});
 					});
-				});
+				}
 
 				// Filter upcoming appointments (confirmed or pending status, and future dates)
 				const upcomingAppointments = response.data
@@ -87,7 +99,7 @@ export default function HomeScreen() {
 						appointmentDateOnly.setHours(0, 0, 0, 0);
 
 						const isFuture = appointmentDate > now || appointmentDateOnly.getTime() === today.getTime();
-						if (!isFuture) {
+						if (__DEV__ && !isFuture) {
 							console.log('❌ Filtered out - not future. Appointment:', {
 								id: appointment.id,
 								appointmentDateTime: appointmentDate.toString(),
@@ -97,7 +109,7 @@ export default function HomeScreen() {
 								timeSlot: appointment.timeSlot,
 								combinedDateTime: appointmentDate.toString()
 							});
-						} else {
+						} else if (__DEV__) {
 							console.log('✅ Future appointment found:', {
 								id: appointment.id,
 								appointmentDateTime: appointmentDate.toString(),
@@ -110,23 +122,33 @@ export default function HomeScreen() {
 					})
 					.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
 
-				console.log('✅ Filtered upcoming appointments:', upcomingAppointments.length, upcomingAppointments);
+				if (__DEV__) {
+					console.log('✅ Filtered upcoming appointments:', upcomingAppointments.length, upcomingAppointments);
+				}
 
 				// Get the next upcoming appointment
 				if (upcomingAppointments.length > 0) {
-					console.log('🎯 Next appointment:', upcomingAppointments[0]);
+					if (__DEV__) {
+						console.log('🎯 Next appointment:', upcomingAppointments[0]);
+					}
 					setUpcomingAppointment(upcomingAppointments[0]);
 				} else {
-					console.log('❌ No upcoming appointments found');
+					if (__DEV__) {
+						console.log('❌ No upcoming appointments found');
+					}
 					setUpcomingAppointment(null);
 				}
 			} else {
-				console.log('❌ No appointments data or API failed');
+				if (__DEV__) {
+					console.log('❌ No appointments data or API failed');
+				}
 				setUpcomingAppointment(null);
 			}
 			setResponse(response);
 		} catch (error) {
-			console.error('Error fetching upcoming appointment:', error);
+			if (__DEV__) {
+				console.error('Error fetching upcoming appointment:', error);
+			}
 			Alert.alert('Error', 'Failed to load appointment data');
 		} finally {
 			setIsLoading(false);

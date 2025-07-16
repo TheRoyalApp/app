@@ -162,9 +162,12 @@ const startServer = async () => {
     winstonLogger.info(`📱 API ready for mobile app integration`);
     winstonLogger.info(`🔒 Production features enabled: Rate limiting, CORS, Validation, Logging`);
     
-    console.log(`🚀 Server running at http://localhost:${port}`);
-    console.log(`📊 Health check: http://localhost:${port}/health`);
-    console.log(`📚 API info: http://localhost:${port}/`);
+    // Only log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🚀 Server running at http://localhost:${port}`);
+      console.log(`📊 Health check: http://localhost:${port}/health`);
+      console.log(`📚 API info: http://localhost:${port}/`);
+    }
 
   } catch (error) {
     winstonLogger.error('Failed to start server', error);

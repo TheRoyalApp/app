@@ -11,8 +11,16 @@ import winstonLogger from '../helpers/logger.js';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
 import type { CreateUserRequest, LoginRequest, RefreshTokenRequest } from './auth.d.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'your-refresh-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
+
+// Validate required environment variables
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+if (!REFRESH_SECRET) {
+  throw new Error('REFRESH_SECRET environment variable is required');
+}
 
 export function generateToken(user: any): string {
   const payload = {
@@ -22,7 +30,7 @@ export function generateToken(user: any): string {
     isAdmin: user.isAdmin
   };
 
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: '7d' });
 }
 
 export function generateRefreshToken(user: any): string {
@@ -32,12 +40,12 @@ export function generateRefreshToken(user: any): string {
     type: 'refresh'
   };
 
-  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: '30d' });
+  return jwt.sign(payload, REFRESH_SECRET!, { expiresIn: '30d' });
 }
 
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET!);
   } catch (error) {
     return null;
   }
@@ -45,7 +53,7 @@ export function verifyToken(token: string): any {
 
 export async function verifyRefreshToken(refreshToken: string): Promise<any> {
   try {
-    const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as any;
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET!) as any;
     
     // Verify the token type
     if (decoded.type !== 'refresh') {
