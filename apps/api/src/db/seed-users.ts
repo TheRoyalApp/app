@@ -3,12 +3,22 @@ import { createUser } from '../use-cases/create-user';
 async function seed() {
   const users = [
     {
-      email: 'admin@example.com',
+      email: 'barber@theroyalbarber.com',
+      password: 'BarberPass123',
+      firstName: 'Carlos',
+      lastName: 'Rodriguez',
+      isAdmin: false,
+      role: 'staff',
+      phone: '+1234567890',
+    },
+    {
+      email: 'admin@theroyalbarber.com',
       password: 'AdminPass123',
       firstName: 'Admin',
-      lastName: 'User',
+      lastName: 'Manager',
       isAdmin: true,
-      role: 'admin',
+      role: 'staff',
+      phone: '+1234567891',
     },
     {
       email: 'staff@example.com',
@@ -17,6 +27,7 @@ async function seed() {
       lastName: 'User',
       isAdmin: false,
       role: 'staff',
+      phone: '+1234567892',
     },
   ];
 

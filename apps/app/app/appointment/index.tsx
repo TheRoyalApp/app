@@ -46,76 +46,16 @@ export default function AppointmentScreen() {
 	const [isBooking, setIsBooking] = useState(false);
 	const [selectedServiceName, setSelectedServiceName] = useState<string | null>(null);
 	const [barberError, setBarberError] = useState<string | null>(null);
+	const [isMounted, setIsMounted] = useState(false);
 
 	
 	useEffect(() => {
 		loadInitialData();
+		setIsMounted(true);
 	}, []);
 
-	// Handle deep links from Stripe checkout and WebBrowser returns
-	useEffect(() => {
-		const handleUrl = (url: string) => {
-			console.log('Received URL:', url);
-			
-			if (url.includes('app://payment-callback')) {
-				// Close any open WebBrowser session
-				WebBrowser.dismissBrowser();
-				
-				// Parse URL parameters
-				const urlObj = new URL(url);
-				const status = urlObj.searchParams.get('status');
-				const timeSlot = urlObj.searchParams.get('timeSlot');
-				
-				if (status === 'success' && timeSlot) {
-					// Format the time for display
-					const formatTime = (time: string) => {
-						const [hours, minutes] = time.split(':');
-						const hour = parseInt(hours);
-						const ampm = hour >= 12 ? 'PM' : 'AM';
-						const displayHour = hour % 12 || 12;
-						return `${displayHour}:${minutes} ${ampm}`;
-					};
-					
-					const formattedTime = formatTime(timeSlot);
-					
-					Alert.alert(
-						'¡Pago Exitoso!',
-						`Te esperamos a las: ${formattedTime}`,
-						[
-							{
-								text: 'OK',
-								onPress: () => router.replace('/(tabs)'),
-							}
-						]
-					);
-				} else {
-					Alert.alert(
-						'Pago Fallido',
-						'El pago no se pudo procesar. Por favor, intenta nuevamente.',
-						[
-							{
-								text: 'OK',
-								onPress: () => router.replace('/(tabs)'),
-							}
-						]
-					);
-				}
-			}
-		};
-
-		const subscription = Linking.addEventListener('url', ({ url }) => {
-			handleUrl(url);
-		});
-
-		// Check if app was opened from a URL
-		Linking.getInitialURL().then((url) => {
-			if (url) {
-				handleUrl(url);
-			}
-		});
-
-		return () => subscription?.remove();
-	}, []);
+	// Note: Deep link handling has been moved to the global layout
+	// This ensures payment callbacks work from anywhere in the app
 
 	const loadInitialData = async () => {
 		try {
@@ -149,11 +89,21 @@ export default function AppointmentScreen() {
 
 	const retryLoadBarbers = async () => {
 		try {
+			console.log('🔄 Retrying barber load...');
 			setBarbers([]); // Clear existing barbers
 			setBarberError(null); // Clear any previous errors
+			
+			// Test network connectivity first
+			const isConnected = await testNetworkConnectivity();
+			if (!isConnected) {
+				setBarberError('No se puede conectar al servidor. Verifica tu conexión a internet.');
+				return;
+			}
+			
 			await loadBarbers();
 		} catch (error) {
-			console.error('Error retrying barbers load:', error);
+			console.error('❌ Error retrying barbers load:', error);
+			setBarberError('Error al cargar barberos. Por favor, intenta nuevamente.');
 		}
 	};
 
@@ -216,15 +166,42 @@ export default function AppointmentScreen() {
 		}
 	};
 
+	// Network connectivity test
+	const testNetworkConnectivity = async () => {
+		try {
+			console.log('🌐 Testing network connectivity to:', API_CONFIG.baseURL);
+			const response = await fetch(`${API_CONFIG.baseURL}/health`, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			console.log('✅ Network connectivity test successful:', response.status);
+			return true;
+		} catch (error) {
+			console.log('❌ Network connectivity test failed:', error);
+			return false;
+		}
+	};
+
 	const loadBarbers = async () => {
 		try {
 			setIsLoadingBarbers(true);
 			setBarberError(null);
-			console.log('Loading barbers...');
+			console.log('🔄 Loading barbers from:', `${API_CONFIG.baseURL}/users/staff`);
+			
+			// Test network connectivity first
+			const isConnected = await testNetworkConnectivity();
+			if (!isConnected) {
+				setBarberError('No se puede conectar al servidor. Verifica tu conexión a internet.');
+				setBarbers([]);
+				setSelectedBarber(null);
+				return;
+			}
 			
 			// Use a faster request without retry logic for better UX
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
 			
 			try {
 				const response = await fetch(`${API_CONFIG.baseURL}/users/staff`, {
@@ -238,24 +215,32 @@ export default function AppointmentScreen() {
 				
 				clearTimeout(timeoutId);
 				
+				console.log('📡 Barber API Response Status:', response.status);
+				console.log('📡 Barber API Response Headers:', Object.fromEntries(response.headers.entries()));
+				
 				if (!response.ok) {
 					let errorMessage = `HTTP ${response.status}`;
 					try {
 						const errorData = await response.json();
 						errorMessage = errorData.message || errorData.error || errorMessage;
+						console.log('❌ Barber API Error Response:', errorData);
 					} catch (parseError) {
 						// If we can't parse the error response, use the status text
 						errorMessage = response.statusText || errorMessage;
+						console.log('❌ Barber API Parse Error:', parseError);
 					}
 					throw new Error(errorMessage);
 				}
 				
 				const data = await response.json();
+				console.log('✅ Barber API Success Response:', data);
 				
 				if (data.success && data.data && Array.isArray(data.data)) {
-					console.log('Staff users found:', data.data);
+					console.log('👥 Staff users found:', data.data.length);
+					console.log('👥 Staff users data:', data.data);
 					
 					if (data.data.length === 0) {
+						console.log('⚠️ No barbers found in response');
 						setBarberError('No hay barberos disponibles en el sistema');
 						setBarbers([]);
 						setSelectedBarber(null);
@@ -270,7 +255,7 @@ export default function AppointmentScreen() {
 						lastName: user.lastName
 					}));
 					
-					console.log('Mapped barbers:', mappedBarbers);
+					console.log('🎯 Mapped barbers:', mappedBarbers);
 					setBarbers(mappedBarbers);
 					
 					// Auto-select Carlos Rodriguez if available
@@ -283,7 +268,7 @@ export default function AppointmentScreen() {
 							firstName: carlos.firstName,
 							lastName: carlos.lastName
 						};
-						console.log('Auto-selecting Carlos:', selectedCarlos);
+						console.log('🎯 Auto-selecting Carlos:', selectedCarlos);
 						setSelectedBarber(selectedCarlos);
 					} else if (data.data.length > 0) {
 						// If Carlos not found, select the first available barber
@@ -295,25 +280,32 @@ export default function AppointmentScreen() {
 							firstName: firstBarber.firstName,
 							lastName: firstBarber.lastName
 						};
-						console.log('Auto-selecting first barber:', selectedFirstBarber);
+						console.log('🎯 Auto-selecting first barber:', selectedFirstBarber);
 						setSelectedBarber(selectedFirstBarber);
 					}
 				} else {
-					console.log('API response failed or no data');
+					console.log('❌ API response failed or no data');
+					console.log('❌ Response structure:', {
+						success: data.success,
+						hasData: !!data.data,
+						isArray: Array.isArray(data.data),
+						dataType: typeof data.data
+					});
 					setBarberError('No se pudieron cargar los barberos. Por favor, intenta nuevamente.');
 					setBarbers([]);
 					setSelectedBarber(null);
 				}
 			} catch (fetchError) {
 				clearTimeout(timeoutId);
+				console.log('❌ Fetch error in loadBarbers:', fetchError);
 				throw fetchError;
 			}
 		} catch (error) {
-			console.error('Error loading barbers:', error);
+			console.error('❌ Error loading barbers:', error);
 			
 			// Log detailed error information for debugging
 			if (error instanceof Error) {
-				console.log('Barbers error details:', {
+				console.log('🔍 Barbers error details:', {
 					name: error.name,
 					message: error.message,
 					stack: error.stack
@@ -379,12 +371,15 @@ export default function AppointmentScreen() {
 			const dateObj = new Date(selectedDate);
 			const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 			
-			// Create checkout session data
+			// Create checkout session data with detailed URLs
+			const successUrl = `app://payment/success?status=success&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}`;
+			const cancelUrl = `app://payment/failed?status=cancel&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}&errorMessage=${encodeURIComponent('Pago cancelado por el usuario')}`;
+			
 			const checkoutData = {
 				serviceId: selectedService.id,
 				paymentType: paymentType,
-				successUrl: `app://payment-callback?status=success&timeSlot=${selectedTime}&appointmentDate=${formattedDate}`,
-				cancelUrl: `app://payment-callback?status=cancel&timeSlot=${selectedTime}&appointmentDate=${formattedDate}`,
+				successUrl,
+				cancelUrl,
 				userId: user.id,
 				appointmentData: {
 					barberId: selectedBarber.id,
@@ -417,11 +412,42 @@ export default function AppointmentScreen() {
 				
 				// Handle the browser result
 				if (result.type === 'cancel') {
-					Alert.alert(
-						'Pago Cancelado',
-						'El pago fue cancelado. Tu cita no ha sido reservada. Puedes intentar nuevamente.',
-						[{ text: 'OK', style: 'default' }]
-					);
+					// Navigate to failed screen when user cancels
+					const appointmentDate = formattedDate;
+					const serviceName = selectedService.name;
+					const barberName = selectedBarber.name;
+					const amount = selectedService.price;
+					const errorMessage = 'Pago cancelado por el usuario';
+					
+					if (isMounted) {
+						try {
+							router.replace({
+								pathname: '/payment/failed',
+								params: {
+									timeSlot: selectedTime,
+									appointmentDate,
+									serviceName,
+									barberName,
+									amount,
+									errorMessage,
+								}
+							});
+						} catch (navError) {
+							console.error('Navigation error:', navError);
+							Alert.alert(
+								'Error de Navegación',
+								'No se pudo mostrar la pantalla de error. Por favor, intenta nuevamente.',
+								[{ text: 'OK', style: 'default' }]
+							);
+						}
+					} else {
+						// Fallback if component is not mounted
+						Alert.alert(
+							'Pago Cancelado',
+							'El pago fue cancelado. Tu cita no ha sido reservada. Puedes intentar nuevamente.',
+							[{ text: 'OK', style: 'default' }]
+						);
+					}
 				} else if (result.type === 'dismiss') {
 					// User closed the browser - payment callback will handle the result
 					console.log('Payment browser dismissed - callback will handle result');
@@ -431,7 +457,17 @@ export default function AppointmentScreen() {
 			}
 		} catch (error) {
 			console.error('Error creating payment session:', error);
-			Alert.alert('Error', 'Failed to create payment session');
+			
+			// Check if the error is related to navigation timing
+			if (error instanceof Error && error.message.includes('Root Layout')) {
+				Alert.alert(
+					'Error de Navegación',
+					'El sistema de navegación no está listo. Por favor, intenta nuevamente.',
+					[{ text: 'OK', style: 'default' }]
+				);
+			} else {
+				Alert.alert('Error', 'Failed to create payment session');
+			}
 		} finally {
 			setIsBooking(false);
 		}

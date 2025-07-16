@@ -26,6 +26,7 @@ export interface AvailabilityResponse {
   barberId: string;
   date: string;
   availableSlots: TimeSlot[];
+  bookedSlots: string[];
   barber?: {
     id: string;
     name: string;
@@ -70,7 +71,7 @@ export class SchedulesService {
 
       if (response.success && response.data) {
         // Transform backend response to frontend format
-        // The backend already returns only available slots (not booked)
+        // El backend ya retorna los slots disponibles y los ocupados
         const transformedResponse: AvailabilityResponse = {
           barberId: response.data.barberId,
           date: date, // Keep original format for frontend
@@ -80,6 +81,7 @@ export class SchedulesService {
             isAvailable: true,
             isBooked: false,
           })),
+          bookedSlots: response.data.bookedSlots,
         };
 
         return {
@@ -132,6 +134,45 @@ export class SchedulesService {
       return {
         success: false,
         error: 'Error al cargar los horarios. Por favor, intenta nuevamente.',
+      };
+    }
+  }
+
+  // Debug method to get all appointments for a specific date
+  static async getDebugAppointments(barberId: string, date: string): Promise<ApiResponse<any>> {
+    try {
+      // Convert date from yyyy-mm-dd to dd/mm/yyyy format for backend
+      const [year, month, day] = date.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+      
+      const response = await apiClient.post<any>('/schedules/debug-appointments', {
+        barberId,
+        date: formattedDate,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Error getting debug appointments:', error);
+      return {
+        success: false,
+        error: 'Error de conexión. Por favor, verifica tu conexión e intenta nuevamente.',
+      };
+    }
+  }
+
+  // Debug method to get all appointments for a barber
+  static async getAllDebugAppointments(barberId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<any>('/schedules/debug-all-appointments', {
+        barberId,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Error getting all debug appointments:', error);
+      return {
+        success: false,
+        error: 'Error de conexión. Por favor, verifica tu conexión e intenta nuevamente.',
       };
     }
   }

@@ -39,6 +39,8 @@ export default function AppointmentDatePicker({
   const [isTimePickerVisible, setIsTimePickerVisible] = useState(false)
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null)
   const [isLoadingTimes, setIsLoadingTimes] = useState(false)
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0)
+  const [debugAppointments, setDebugAppointments] = useState<any[]>([])
 
   // Use external state if provided, otherwise use internal state
   const selectedDate = externalSelectedDate !== undefined ? externalSelectedDate : internalSelectedDate
@@ -47,6 +49,48 @@ export default function AppointmentDatePicker({
   // Get today's date in local timezone to allow same-day bookings
   const today = new Date()
   const todayString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`
+
+  const loadDebugAppointments = async (date: string) => {
+    try {
+      const { SchedulesService } = await import('@/services');
+      const debugResponse = await SchedulesService.getDebugAppointments(barberId, date);
+      if (debugResponse.success && debugResponse.data) {
+        setDebugAppointments(debugResponse.data.appointments || []);
+        console.log('Debug appointments loaded:', debugResponse.data.appointments);
+      }
+    } catch (error) {
+      console.error('Error loading debug appointments:', error);
+    }
+  }
+
+  const loadAllDebugAppointments = async () => {
+    try {
+      const { SchedulesService } = await import('@/services');
+      const allDebugResponse = await SchedulesService.getAllDebugAppointments(barberId);
+      if (allDebugResponse.success && allDebugResponse.data) {
+        console.log('All appointments for barber:', allDebugResponse.data);
+        console.log('Total appointments found:', allDebugResponse.data.totalAppointments);
+        console.log('Appointments details:', allDebugResponse.data.appointments);
+        
+        // Filter appointments for the selected date
+        const selectedDateObj = new Date(selectedDate + 'T00:00:00.000Z');
+        const startOfDay = new Date(selectedDateObj);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(selectedDateObj);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        const appointmentsForSelectedDate = allDebugResponse.data.appointments.filter((apt: any) => {
+          const aptDate = new Date(apt.appointmentDate);
+          return aptDate >= startOfDay && aptDate <= endOfDay;
+        });
+        
+        console.log('Appointments for selected date:', selectedDate, appointmentsForSelectedDate);
+        setDebugAppointments(appointmentsForSelectedDate);
+      }
+    } catch (error) {
+      console.error('Error loading all debug appointments:', error);
+    }
+  }
 
   const loadAvailability = async (date: string) => {
     try {
@@ -57,7 +101,22 @@ export default function AppointmentDatePicker({
       console.log('Availability response:', response)
       
       if (response.success && response.data) {
+        console.log('Availability data received:', {
+          barberId: response.data.barberId,
+          date: response.data.date,
+          availableSlots: response.data.availableSlots,
+          bookedSlots: response.data.bookedSlots,
+          availableSlotsCount: response.data.availableSlots?.length || 0,
+          bookedSlotsCount: response.data.bookedSlots?.length || 0
+        })
+        
         setAvailability(response.data)
+        
+        // Also load debug appointments to get the most accurate data
+        await loadDebugAppointments(date)
+        
+        // Temporary: Load all appointments to debug the issue
+        await loadAllDebugAppointments()
         
         // Check if there are no available slots and show alert
         const availableSlots = response.data.availableSlots || []
@@ -114,7 +173,38 @@ export default function AppointmentDatePicker({
     loadAvailability(newDate)
   }
 
-  const handleTimeSelect = (time: string) => {
+  const handleTimeSelect = async (time: string) => {
+    // Validate time slot availability before allowing selection
+    try {
+      const { SchedulesService } = await import('@/services');
+      const response = await SchedulesService.getAvailability(barberId, selectedDate);
+      
+      if (response.success && response.data) {
+        // Check if the time is in available slots
+        const availableSlots = response.data.availableSlots || [];
+        const isSlotAvailable = availableSlots.some(slot => slot.time === time);
+        
+        // Also check if it's not in booked slots
+        const bookedSlots = response.data.bookedSlots || [];
+        const isSlotBooked = bookedSlots.some((slot: any) => {
+          const bookedTime = typeof slot === 'string' ? slot : (slot?.time || slot?.timeSlot || '');
+          return bookedTime === time;
+        });
+        
+        if (!isSlotAvailable || isSlotBooked) {
+          Alert.alert(
+            'Horario no disponible',
+            'Este horario ya no está disponible. Por favor, selecciona otro horario.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error validating time slot availability:', error);
+      // Continue with selection even if validation fails
+    }
+    
     if (externalSelectedTime === undefined) {
       setInternalSelectedTime(time)
     }
@@ -167,28 +257,164 @@ export default function AppointmentDatePicker({
         isBooked: false,
       }))
     }
+
+    // Extract booked times with robust handling of different formats
+    const bookedTimes: string[] = []
+    if (availability.bookedSlots && Array.isArray(availability.bookedSlots)) {
+      availability.bookedSlots.forEach((slot: any) => {
+        if (typeof slot === 'string') {
+          bookedTimes.push(slot)
+        } else if (slot && typeof slot === 'object' && typeof slot.time === 'string') {
+          bookedTimes.push(slot.time)
+        } else if (slot && typeof slot === 'object' && typeof slot.timeSlot === 'string') {
+          bookedTimes.push(slot.timeSlot)
+        }
+      })
+    }
+
+    // Debug logging
+    console.log('[getAvailableTimeSlots] Debug info:', {
+      selectedDate,
+      barberId,
+      availableSlots: availability.availableSlots,
+      bookedSlots: availability.bookedSlots,
+      extractedBookedTimes: bookedTimes,
+      timeSlotsBeforeFilter: timeSlots.map(s => s.time),
+      debugAppointmentsCount: debugAppointments.length
+    });
+
+    // Filter out booked slots with strict equality check
+    timeSlots = timeSlots.filter(slot => {
+      // Normalize time format for comparison (ensure HH:MM format)
+      const normalizeTime = (time: string) => {
+        if (!time) return ''
+        // Handle formats like "9:00", "09:00", "9:00 AM", etc.
+        const cleanTime = time.replace(/\s*(AM|PM|am|pm)/i, '').trim()
+        if (cleanTime.includes(':')) {
+          const [hours, minutes] = cleanTime.split(':')
+          return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+        }
+        // If it's just a number, assume it's hours
+        return `${cleanTime.padStart(2, '0')}:00`
+      }
+
+      const normalizedSlotTime = normalizeTime(slot.time)
+      const isBooked = bookedTimes.some(bookedTime => {
+        const normalizedBookedTime = normalizeTime(bookedTime)
+        const matches = normalizedBookedTime === normalizedSlotTime
+        if (matches) {
+          console.log(`[getAvailableTimeSlots] Found booked slot: ${slot.time} matches ${bookedTime} (normalized: ${normalizedSlotTime} === ${normalizedBookedTime})`)
+        }
+        return matches
+      })
+
+      if (isBooked) {
+        console.log(`[getAvailableTimeSlots] Filtering out booked slot: ${slot.time}`)
+      }
+
+      return !isBooked
+    })
     
     // Filter out past hours for today only
     const now = new Date()
     const currentTime = now.getHours() * 60 + now.getMinutes() // Current time in minutes
     
-    return timeSlots.filter((slot) => {
+    const finalSlots = timeSlots.filter((slot) => {
       // For today's date, check if the time has passed
       if (selectedDate === todayString) {
         const [hours, minutes] = slot.time.split(':').map(Number)
         const slotTimeInMinutes = hours * 60 + minutes
-        
         // Only show slots that are at least 30 minutes in the future
         return slotTimeInMinutes > currentTime + 30
       }
-      
       // For future dates, show all available slots (backend already filtered out booked ones)
       return true
     })
+
+    // Additional filtering using debug appointments data
+    const finalFilteredSlots = finalSlots.filter(slot => {
+      // Check if this slot has any existing appointments (excluding cancelled ones)
+      const hasExistingAppointments = debugAppointments.some(apt => 
+        apt.timeSlot === slot.time && apt.status !== 'cancelled'
+      )
+      
+      if (hasExistingAppointments) {
+        console.log(`[getAvailableTimeSlots] Filtering out slot with existing appointments: ${slot.time}`)
+        return false
+      }
+      
+      return true
+    })
+
+    console.log('[getAvailableTimeSlots] Final available slots after debug filtering:', finalFilteredSlots.map(s => s.time))
+    return finalFilteredSlots
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (selectedDate && selectedTime) {
+      // Final validation before confirming - refresh availability first
+      try {
+        const { SchedulesService } = await import('@/services');
+        
+        // Refresh availability to get the most current data
+        const response = await SchedulesService.getAvailability(barberId, selectedDate);
+        
+        if (response.success && response.data) {
+          // Check if the time is in available slots
+          const availableSlots = response.data.availableSlots || [];
+          const isSlotAvailable = availableSlots.some(slot => slot.time === selectedTime);
+          
+          // Also check if it's not in booked slots
+          const bookedSlots = response.data.bookedSlots || [];
+          const isSlotBooked = bookedSlots.some((slot: any) => {
+            const bookedTime = typeof slot === 'string' ? slot : (slot?.time || slot?.timeSlot || '');
+            return bookedTime === selectedTime;
+          });
+          
+          if (!isSlotAvailable || isSlotBooked) {
+            Alert.alert(
+              'Horario no disponible',
+              'Este horario ya no está disponible. Por favor, selecciona otro horario.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          
+          // Additional validation: check if there are any appointments at this time
+          const debugResponse = await SchedulesService.getDebugAppointments(barberId, selectedDate);
+          if (debugResponse.success && debugResponse.data) {
+            const existingAppointments = debugResponse.data.appointments || [];
+            const conflictingAppointments = existingAppointments.filter((apt: any) => 
+              apt.timeSlot === selectedTime && apt.status !== 'cancelled'
+            );
+            
+            if (conflictingAppointments.length > 0) {
+              Alert.alert(
+                'Horario ocupado',
+                `Este horario ya tiene ${conflictingAppointments.length} cita(s) programada(s). Por favor, selecciona otro horario.`,
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+          }
+        } else {
+          Alert.alert(
+            'Error de validación',
+            'No se pudo verificar la disponibilidad del horario. Por favor, intenta nuevamente.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('Error validating time slot availability:', error);
+        Alert.alert(
+          'Error de conexión',
+          'No se pudo verificar la disponibilidad. Por favor, verifica tu conexión e intenta nuevamente.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       if (onConfirm) {
         onConfirm(selectedDate, selectedTime)
       } else {
@@ -227,8 +453,14 @@ export default function AppointmentDatePicker({
       <View style={styles.section}>
         <Text style={styles.label}>Seleccionar Hora</Text>
         <Button
-          onPress={() => {
+          onPress={async () => {
             if (selectedDate) {
+              // Always refresh availability before opening time picker
+              setIsLoadingTimes(true);
+              await loadAvailability(selectedDate);
+              setLastRefreshTime(Date.now());
+              setIsLoadingTimes(false);
+              
               if (getAvailableTimeSlots().length > 0) {
                 setIsTimePickerVisible(true)
               } else {
@@ -327,7 +559,12 @@ export default function AppointmentDatePicker({
             <View style={styles.modalSpacer} />
           </View>
           <ScrollView style={styles.timeList}>
-            {getAvailableTimeSlots().length > 0 ? (
+            {isLoadingTimes ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.dark.primary} />
+                <Text style={styles.loadingText}>Actualizando horarios disponibles...</Text>
+              </View>
+            ) : getAvailableTimeSlots().length > 0 ? (
               getAvailableTimeSlots().map((slot) => (
                 <TouchableOpacity
                   key={slot.id}
@@ -457,5 +694,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.dark.textLight,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.dark.textLight,
+    textAlign: 'center',
+    marginTop: 16,
   },
 }) 

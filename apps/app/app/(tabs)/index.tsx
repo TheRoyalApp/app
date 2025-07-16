@@ -1,11 +1,9 @@
 // React Native core imports
 import React from 'react';
-import { StatusBar, View, ScrollView, Alert, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, Alert, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
 
 // Third-party library imports
-import { Mail } from 'lucide-react-native';
 import { Link, router, useFocusEffect } from 'expo-router';
 
 // Local imports
@@ -195,7 +193,6 @@ export default function HomeScreen() {
 					<ThemeText style={{ fontSize: 24, fontWeight: 'bold' }}>
 						Inicio
 					</ThemeText>
-					<Mail color={Colors.dark.text} />
 				</View>
 
 				<Container>
@@ -265,18 +262,39 @@ export default function HomeScreen() {
 						<Button onPress={() => router.push('/appointment')}>
 							Agendar cita
 						</Button>
-						<Button secondary onPress={() => {
-							if (upcomingAppointment) {
-								console.log('🔍 RESCHEDULE NAVIGATION DEBUG:', {
-									appointmentId: upcomingAppointment.id,
-									appointmentUserId: upcomingAppointment.userId,
-									currentUserId: user?.id,
-									appointment: upcomingAppointment
-								});
-								router.push(`/appointment/reschedule/${upcomingAppointment.id}`);
-							}
-						}}>
-							Reagendar
+						<Button 
+							secondary 
+							disabled={!upcomingAppointment}
+							onPress={() => {
+								console.log('🔍 RESCHEDULE BUTTON CLICKED');
+								console.log('upcomingAppointment:', upcomingAppointment);
+								console.log('user:', user);
+								
+								if (upcomingAppointment) {
+									console.log('🔍 RESCHEDULE NAVIGATION DEBUG:', {
+										appointmentId: upcomingAppointment.id,
+										appointmentUserId: upcomingAppointment.userId,
+										currentUserId: user?.id,
+										appointment: upcomingAppointment
+									});
+									
+									try {
+										// Add a small delay to show button press feedback
+										setTimeout(() => {
+											console.log('🚀 Navigating to reschedule page...');
+											router.push(`/appointment/reschedule/${upcomingAppointment.id}`);
+										}, 100);
+									} catch (error) {
+										console.error('❌ Navigation error:', error);
+										Alert.alert('Error', 'No se pudo abrir la página de reprogramación');
+									}
+								} else {
+									console.log('❌ No appointment available for reschedule');
+									Alert.alert('Sin citas', 'No tienes citas disponibles para reprogramar');
+								}
+							}}
+						>
+							{upcomingAppointment ? 'Reagendar' : 'Sin citas'}
 						</Button>
 					</View>
 

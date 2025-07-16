@@ -9,9 +9,11 @@ import {
 } from '@react-navigation/native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Linking, Alert } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import 'react-native-reanimated';
 
 // Local imports
@@ -34,6 +36,7 @@ SplashScreen.preventAutoHideAsync();
 function RootLayoutNav() {
 	const { user, isLoading, isFirstTime } = useAuth();
 	const [forceUpdate, setForceUpdate] = React.useState(0);
+	const router = useRouter();
 
 	console.log('=== ROOT LAYOUT NAV DEBUG ===');
 	console.log('isLoading:', isLoading);
@@ -65,6 +68,221 @@ function RootLayoutNav() {
 		return () => clearTimeout(timer);
 	}, [isLoading]);
 
+	// Global deep link handling for payment callbacks
+	React.useEffect(() => {
+		const handleUrl = (url: string) => {
+			console.log('Global URL handler received:', url);
+			
+			// Handle payment success URLs
+			if (url.includes('app://payment/success')) {
+				// Close any open WebBrowser session
+				WebBrowser.dismissBrowser();
+				
+				// Parse URL parameters
+				const urlObj = new URL(url);
+				const status = urlObj.searchParams.get('status');
+				const timeSlot = urlObj.searchParams.get('timeSlot');
+				
+				if (status === 'success' && timeSlot) {
+					// Navigate to success screen with appointment details
+					const appointmentDate = urlObj.searchParams.get('appointmentDate');
+					const serviceName = urlObj.searchParams.get('serviceName');
+					const barberName = urlObj.searchParams.get('barberName');
+					const amount = urlObj.searchParams.get('amount');
+					
+					console.log('Attempting to navigate to success screen with params:', {
+						timeSlot,
+						appointmentDate,
+						serviceName,
+						barberName,
+						amount,
+					});
+					
+					// Add a small delay to ensure navigation is ready
+					setTimeout(() => {
+						try {
+							router.replace({
+								pathname: '/payment/success',
+								params: {
+									timeSlot,
+									appointmentDate,
+									serviceName,
+									barberName,
+									amount,
+								}
+							});
+						} catch (navError) {
+							console.error('Global navigation error in success handler:', navError);
+							// Fallback to alert if navigation fails
+							Alert.alert(
+								'¡Pago Exitoso!',
+								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+							);
+						}
+					}, 100);
+				}
+			}
+			// Handle payment failure URLs
+			else if (url.includes('app://payment/failed')) {
+				// Close any open WebBrowser session
+				WebBrowser.dismissBrowser();
+				
+				// Parse URL parameters
+				const urlObj = new URL(url);
+				const status = urlObj.searchParams.get('status');
+				const timeSlot = urlObj.searchParams.get('timeSlot');
+				
+				if (status === 'cancel' && timeSlot) {
+					// Navigate to failed screen with error details
+					const appointmentDate = urlObj.searchParams.get('appointmentDate');
+					const serviceName = urlObj.searchParams.get('serviceName');
+					const barberName = urlObj.searchParams.get('barberName');
+					const amount = urlObj.searchParams.get('amount');
+					const errorMessage = urlObj.searchParams.get('errorMessage') || 'El pago no se pudo procesar. Por favor, intenta nuevamente.';
+					
+					console.log('Attempting to navigate to failed screen with params:', {
+						timeSlot,
+						appointmentDate,
+						serviceName,
+						barberName,
+						amount,
+						errorMessage,
+					});
+					
+					// Add a small delay to ensure navigation is ready
+					setTimeout(() => {
+						try {
+							router.replace({
+								pathname: '/payment/failed',
+								params: {
+									timeSlot,
+									appointmentDate,
+									serviceName,
+									barberName,
+									amount,
+									errorMessage,
+								}
+							});
+						} catch (navError) {
+							console.error('Global navigation error in failure handler:', navError);
+							// Fallback to alert if navigation fails
+							Alert.alert(
+								'Pago Fallido',
+								errorMessage,
+								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+							);
+						}
+					}, 100);
+				}
+			}
+			// Handle legacy payment-callback URLs for backward compatibility
+			else if (url.includes('app://payment-callback')) {
+				// Close any open WebBrowser session
+				WebBrowser.dismissBrowser();
+				
+				// Parse URL parameters
+				const urlObj = new URL(url);
+				const status = urlObj.searchParams.get('status');
+				const timeSlot = urlObj.searchParams.get('timeSlot');
+				
+				if (status === 'success' && timeSlot) {
+					// Navigate to success screen with appointment details
+					const appointmentDate = urlObj.searchParams.get('appointmentDate');
+					const serviceName = urlObj.searchParams.get('serviceName');
+					const barberName = urlObj.searchParams.get('barberName');
+					const amount = urlObj.searchParams.get('amount');
+					
+					console.log('Attempting to navigate to success screen with params:', {
+						timeSlot,
+						appointmentDate,
+						serviceName,
+						barberName,
+						amount,
+					});
+					
+					// Add a small delay to ensure navigation is ready
+					setTimeout(() => {
+						try {
+							router.replace({
+								pathname: '/payment/success',
+								params: {
+									timeSlot,
+									appointmentDate,
+									serviceName,
+									barberName,
+									amount,
+								}
+							});
+						} catch (navError) {
+							console.error('Global navigation error in success handler:', navError);
+							// Fallback to alert if navigation fails
+							Alert.alert(
+								'¡Pago Exitoso!',
+								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+							);
+						}
+					}, 100);
+				} else {
+					// Navigate to failed screen with error details
+					const appointmentDate = urlObj.searchParams.get('appointmentDate');
+					const serviceName = urlObj.searchParams.get('serviceName');
+					const barberName = urlObj.searchParams.get('barberName');
+					const amount = urlObj.searchParams.get('amount');
+					const errorMessage = urlObj.searchParams.get('errorMessage') || 'El pago no se pudo procesar. Por favor, intenta nuevamente.';
+					
+					console.log('Attempting to navigate to failed screen with params:', {
+						timeSlot,
+						appointmentDate,
+						serviceName,
+						barberName,
+						amount,
+						errorMessage,
+					});
+					
+					// Add a small delay to ensure navigation is ready
+					setTimeout(() => {
+						try {
+							router.replace({
+								pathname: '/payment/failed',
+								params: {
+									timeSlot,
+									appointmentDate,
+									serviceName,
+									barberName,
+									amount,
+									errorMessage,
+								}
+							});
+						} catch (navError) {
+							console.error('Global navigation error in failure handler:', navError);
+							// Fallback to alert if navigation fails
+							Alert.alert(
+								'Pago Fallido',
+								errorMessage,
+								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+							);
+						}
+					}, 100);
+				}
+			}
+		};
+
+		const subscription = Linking.addEventListener('url', ({ url }) => {
+			handleUrl(url);
+		});
+
+		// Check if app was opened from a URL
+		Linking.getInitialURL().then((url) => {
+			if (url) {
+				handleUrl(url);
+			}
+		});
+
+		return () => subscription?.remove();
+	}, [router]);
+
 	if (isLoading && !showFallback) {
 		console.log('Showing LoadingScreen');
 		return <LoadingScreen />;
@@ -95,6 +313,10 @@ function RootLayoutNav() {
 		<ThemeProvider value={DarkTheme}>
 			<Stack screenOptions={{ headerShown: false }}>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="payment/success" options={{ headerShown: false }} />
+				<Stack.Screen name="payment/failed" options={{ headerShown: false }} />
+				<Stack.Screen name="payment/test" options={{ headerShown: false }} />
+				<Stack.Screen name="payment/debug" options={{ headerShown: false }} />
 			</Stack>
 		</ThemeProvider>
 	);

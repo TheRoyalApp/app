@@ -198,25 +198,7 @@ export async function getAvailability(barberId: string, date: string) {
         )
       );
 
-    // Get booked time slots
-    const bookedSlots = appointmentsList
-      .filter(apt => apt.status !== 'cancelled')
-      .map(apt => apt.timeSlot as TimeSlot);
-
-    // Calculate available slots
-    const availableSlots = (schedule[0]?.availableTimeSlots || []).filter(
-      slot => !bookedSlots.includes(slot as TimeSlot)
-    ) as TimeSlot[];
-
-    const availability: ScheduleAvailability = {
-      barberId,
-      dayOfWeek,
-      date,
-      availableSlots,
-      bookedSlots
-    };
-
-    // Normalize all slots to 'HH:MM' format
+    // Normalize function
     function normalizeSlot(slot: string) {
       if (/^\d{1,2}$/.test(slot)) {
         return (slot.padStart(2, '0') + ':00') as TimeSlot;
@@ -228,8 +210,39 @@ export async function getAvailability(barberId: string, date: string) {
       }
       return slot as TimeSlot;
     }
-    availability.availableSlots = (availability.availableSlots || []).map(normalizeSlot) as TimeSlot[];
-    availability.bookedSlots = (availability.bookedSlots || []).map(normalizeSlot) as TimeSlot[];
+
+    // Get booked time slots and normalize them
+    // Only exclude cancelled appointments - all others (pending, confirmed, completed) are considered booked
+    const bookedSlots = appointmentsList
+      .filter(apt => apt.status !== 'cancelled')
+      .map(apt => normalizeSlot(apt.timeSlot));
+
+    console.log('[getAvailability] Found appointments:', appointmentsList.map(apt => ({
+      id: apt.id,
+      timeSlot: apt.timeSlot,
+      status: apt.status,
+      date: apt.appointmentDate
+    })));
+    console.log('[getAvailability] Booked slots after filtering:', bookedSlots);
+
+    // Get available slots from schedule and normalize them
+    const scheduleAvailableSlots = (schedule[0]?.availableTimeSlots || []).map(normalizeSlot);
+
+    // Calculate available slots (filter out booked ones)
+    const availableSlots = scheduleAvailableSlots.filter(
+      slot => !bookedSlots.includes(slot)
+    ) as TimeSlot[];
+
+    console.log('[getAvailability] Schedule available slots:', scheduleAvailableSlots);
+    console.log('[getAvailability] Final available slots:', availableSlots);
+
+    const availability: ScheduleAvailability = {
+      barberId,
+      dayOfWeek,
+      date,
+      availableSlots,
+      bookedSlots
+    };
 
     res.data = availability;
     return res;
@@ -339,12 +352,23 @@ export async function isTimeSlotAvailable(barberId: string, date: string, timeSl
           eq(appointments.timeSlot, normalizedTimeSlot),
           gte(appointments.appointmentDate, startOfDay),
           lte(appointments.appointmentDate, endOfDay),
-          sql`${appointments.status} != 'cancelled'`,
+          sql`${appointments.status} != 'cancelled'`, // Only exclude cancelled appointments
           excludeAppointmentId ? sql`${appointments.id} != ${excludeAppointmentId}` : sql`1=1`
         )
       )
       .limit(1);
-    console.log('[isTimeSlotAvailable] existingAppointment', { normalizedTimeSlot, found: existingAppointment.length > 0, existingAppointment });
+    
+    console.log('[isTimeSlotAvailable] existingAppointment', { 
+      normalizedTimeSlot, 
+      found: existingAppointment.length > 0, 
+      appointment: existingAppointment[0] ? {
+        id: existingAppointment[0].id,
+        status: existingAppointment[0].status,
+        timeSlot: existingAppointment[0].timeSlot,
+        date: existingAppointment[0].appointmentDate
+      } : null 
+    });
+    
     return existingAppointment.length === 0; // Available if no existing appointment
   } catch (error) {
     console.error('Error checking time slot availability:', error);

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { getDatabase } from '../db/connection.js';
 import { services, payments, appointments, users } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { errorResponse, successResponse } from '../helpers/response.helper.js';
 import { PaymentHelper } from './payment.helper.js';
@@ -12,6 +12,7 @@ import {
   getPaymentByTransactionId, 
   getUserPayments 
 } from './payments.controller.js';
+import type { TimeSlot } from '../schedules/schedules.d.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-05-28.basil',
@@ -198,6 +199,7 @@ paymentsRoute.post('/checkout', async (c) => {
     } else if (paymentType === 'advance') {
       priceId = service.stripeAdvancePriceId || undefined;
     }
+    
     if (!priceId) {
       return c.json(errorResponse(400, 'Selected payment option is not available for this service'), 400);
     }
@@ -338,6 +340,53 @@ paymentsRoute.post('/webhook', async (c) => {
             if (!dateRegex.test(appointmentDate)) {
               throw new Error(`Invalid appointment date format. Expected dd/mm/yyyy, got: ${appointmentDate}`);
             }
+          }
+
+          // Check if the time slot is available before creating appointment
+          if (barberId && appointmentDate && timeSlot) {
+            const { isTimeSlotAvailable } = await import('../schedules/schedules.controller.js');
+            const isAvailable = await isTimeSlotAvailable(barberId, appointmentDate, timeSlot as TimeSlot);
+            
+            if (!isAvailable) {
+              throw new Error(`El horario seleccionado (${timeSlot}) no está disponible para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
+            }
+            
+                         // Additional check: verify no duplicate appointments exist
+             const dateParts = appointmentDate.split('/');
+             if (dateParts.length === 3) {
+               const [day, month, year] = dateParts;
+               if (day && month && year) {
+                 const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                 const startOfDay = new Date(targetDate);
+                 startOfDay.setHours(0, 0, 0, 0);
+                 const endOfDay = new Date(targetDate);
+                 endOfDay.setHours(23, 59, 59, 999);
+
+                 const existingAppointment = await tx
+                   .select()
+                   .from(appointments)
+                   .where(
+                     and(
+                       eq(appointments.barberId, barberId),
+                       eq(appointments.timeSlot, timeSlot),
+                       gte(appointments.appointmentDate, startOfDay),
+                       lte(appointments.appointmentDate, endOfDay),
+                       sql`${appointments.status} != 'cancelled'`
+                     )
+                   )
+                   .limit(1);
+
+                 if (existingAppointment.length > 0) {
+                   console.error('Duplicate appointment attempt in webhook:', {
+                     barberId,
+                     appointmentDate,
+                     timeSlot,
+                     existingAppointment: existingAppointment[0]
+                   });
+                   throw new Error(`El horario seleccionado (${timeSlot}) ya está reservado para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
+                 }
+               }
+             }
           }
 
           // Create appointment first if appointment data is provided
@@ -515,6 +564,51 @@ paymentsRoute.post('/test-webhook', async (c) => {
         }
         
         console.log('Parsed appointment date:', targetDate);
+        
+        // Check if the time slot is available before creating appointment
+        const { isTimeSlotAvailable } = await import('../schedules/schedules.controller.js');
+        const isAvailable = await isTimeSlotAvailable(barberId, appointmentDate, timeSlot as TimeSlot);
+        
+        if (!isAvailable) {
+          throw new Error(`El horario seleccionado (${timeSlot}) no está disponible para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
+        }
+        
+        // Additional check: verify no duplicate appointments exist
+        const appointmentDateParts = appointmentDate.split('/');
+        if (appointmentDateParts.length === 3) {
+          const [day, month, year] = appointmentDateParts;
+          if (day && month && year) {
+            const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(targetDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            const existingAppointment = await tx
+              .select()
+              .from(appointments)
+              .where(
+                and(
+                  eq(appointments.barberId, barberId),
+                  eq(appointments.timeSlot, timeSlot),
+                  gte(appointments.appointmentDate, startOfDay),
+                  lte(appointments.appointmentDate, endOfDay),
+                  sql`${appointments.status} != 'cancelled'`
+                )
+              )
+              .limit(1);
+
+            if (existingAppointment.length > 0) {
+              console.error('Duplicate appointment attempt in test-webhook:', {
+                barberId,
+                appointmentDate,
+                timeSlot,
+                existingAppointment: existingAppointment[0]
+              });
+              throw new Error(`El horario seleccionado (${timeSlot}) ya está reservado para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
+            }
+          }
+        }
         
         // Create appointment with confirmed status
         const [appointment] = await tx.insert(appointments).values({

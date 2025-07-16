@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getDatabase } from "../db/connection.js";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { appointments, users, services } from "../db/schema.js";
 import type { Appointment, Status } from "./appoinments.d.js";
 import { isTimeSlotAvailable } from "../schedules/schedules.controller.js";
@@ -69,6 +69,37 @@ export async function createAppointment(appointmentData: {
     }
 
     const db = await getDatabase();
+
+    // Additional check: verify no duplicate appointments exist
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingAppointment = await db
+      .select()
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.barberId, barberId),
+          eq(appointments.timeSlot, timeSlot),
+          gte(appointments.appointmentDate, startOfDay),
+          lte(appointments.appointmentDate, endOfDay),
+          sql`${appointments.status} != 'cancelled'`
+        )
+      )
+      .limit(1);
+
+    if (existingAppointment.length > 0) {
+      console.error('Duplicate appointment attempt detected:', {
+        barberId,
+        appointmentDate,
+        timeSlot,
+        existingAppointment: existingAppointment[0]
+      });
+      res.error = 'El horario seleccionado ya está reservado. Por favor, selecciona otro horario.';
+      return res;
+    }
 
     // Validate user exists
     const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);

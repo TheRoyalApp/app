@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Development
   development: {
-    baseURL: 'http://192.168.1.198:3001',
+    baseURL: 'http://localhost:3001',
   },
   
   // Production
