@@ -23,7 +23,10 @@
 		},
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "com.theroyalbarber.app"
+			"bundleIdentifier": "com.theroyalbarber.app",
+			"associatedDomains": [
+				"applinks:theroyalbarber.com"
+			]
 		},
 		"android": {
 			"adaptiveIcon": {
@@ -31,7 +34,30 @@
 				"backgroundColor": "#ffffff"
 			},
 			"edgeToEdgeEnabled": true,
-			"package": "com.theroyalbarber.app"
+			"package": "com.theroyalbarber.app",
+			"intentFilters": [
+				{
+					"action": "VIEW",
+					"autoVerify": true,
+					"data": [
+						{
+							"scheme": "app",
+							"host": "payment",
+							"pathPrefix": "/success"
+						},
+						{
+							"scheme": "app",
+							"host": "payment",
+							"pathPrefix": "/failed"
+						},
+						{
+							"scheme": "app",
+							"host": "payment-callback"
+						}
+					],
+					"category": ["BROWSABLE", "DEFAULT"]
+				}
+			]
 		},
 		"web": {
 			"bundler": "metro",

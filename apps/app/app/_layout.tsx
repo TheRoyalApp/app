@@ -12,7 +12,8 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Linking, Alert } from 'react-native';
+import { Alert } from 'react-native';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import 'react-native-reanimated';
 
@@ -71,7 +72,9 @@ function RootLayoutNav() {
 	// Global deep link handling for payment callbacks
 	React.useEffect(() => {
 		const handleUrl = (url: string) => {
-			console.log('Global URL handler received:', url);
+			console.log('🔗 Global URL handler received:', url);
+			console.log('👤 Current user state:', user ? 'Authenticated' : 'Not authenticated');
+			console.log('⏳ Loading state:', isLoading ? 'Loading' : 'Ready');
 			
 			// Handle payment success URLs
 			if (url.includes('app://payment/success')) {
@@ -98,19 +101,26 @@ function RootLayoutNav() {
 						amount,
 					});
 					
-					// Add a small delay to ensure navigation is ready
-					setTimeout(() => {
+					// Wait for navigation to be ready and user to be authenticated
+					const attemptNavigation = () => {
 						try {
-							router.replace({
-								pathname: '/payment/success',
-								params: {
-									timeSlot,
-									appointmentDate,
-									serviceName,
-									barberName,
-									amount,
-								}
-							});
+							// Check if user is authenticated and navigation is ready
+							if (user && !isLoading) {
+								router.replace({
+									pathname: '/payment/success',
+									params: {
+										timeSlot,
+										appointmentDate,
+										serviceName,
+										barberName,
+										amount,
+									}
+								});
+								return true; // Navigation successful
+							} else {
+								console.log('Navigation not ready yet, retrying...');
+								return false; // Navigation failed, will retry
+							}
 						} catch (navError) {
 							console.error('Global navigation error in success handler:', navError);
 							// Fallback to alert if navigation fails
@@ -119,8 +129,22 @@ function RootLayoutNav() {
 								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
 								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
 							);
+							return true; // Don't retry after fallback
 						}
-					}, 100);
+					};
+					
+					// Try navigation immediately
+					if (!attemptNavigation()) {
+						// If failed, retry with increasing delays
+						const retryDelays = [500, 1000, 2000];
+						retryDelays.forEach((delay, index) => {
+							setTimeout(() => {
+								if (!attemptNavigation()) {
+									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
+								}
+							}, delay);
+						});
+					}
 				}
 			}
 			// Handle payment failure URLs
@@ -150,20 +174,27 @@ function RootLayoutNav() {
 						errorMessage,
 					});
 					
-					// Add a small delay to ensure navigation is ready
-					setTimeout(() => {
+					// Wait for navigation to be ready and user to be authenticated
+					const attemptNavigation = () => {
 						try {
-							router.replace({
-								pathname: '/payment/failed',
-								params: {
-									timeSlot,
-									appointmentDate,
-									serviceName,
-									barberName,
-									amount,
-									errorMessage,
-								}
-							});
+							// Check if user is authenticated and navigation is ready
+							if (user && !isLoading) {
+								router.replace({
+									pathname: '/payment/failed',
+									params: {
+										timeSlot,
+										appointmentDate,
+										serviceName,
+										barberName,
+										amount,
+										errorMessage,
+									}
+								});
+								return true; // Navigation successful
+							} else {
+								console.log('Navigation not ready yet, retrying...');
+								return false; // Navigation failed, will retry
+							}
 						} catch (navError) {
 							console.error('Global navigation error in failure handler:', navError);
 							// Fallback to alert if navigation fails
@@ -172,8 +203,22 @@ function RootLayoutNav() {
 								errorMessage,
 								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
 							);
+							return true; // Don't retry after fallback
 						}
-					}, 100);
+					};
+					
+					// Try navigation immediately
+					if (!attemptNavigation()) {
+						// If failed, retry with increasing delays
+						const retryDelays = [500, 1000, 2000];
+						retryDelays.forEach((delay, index) => {
+							setTimeout(() => {
+								if (!attemptNavigation()) {
+									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
+								}
+							}, delay);
+						});
+					}
 				}
 			}
 			// Handle legacy payment-callback URLs for backward compatibility
@@ -201,19 +246,26 @@ function RootLayoutNav() {
 						amount,
 					});
 					
-					// Add a small delay to ensure navigation is ready
-					setTimeout(() => {
+					// Wait for navigation to be ready and user to be authenticated
+					const attemptNavigation = () => {
 						try {
-							router.replace({
-								pathname: '/payment/success',
-								params: {
-									timeSlot,
-									appointmentDate,
-									serviceName,
-									barberName,
-									amount,
-								}
-							});
+							// Check if user is authenticated and navigation is ready
+							if (user && !isLoading) {
+								router.replace({
+									pathname: '/payment/success',
+									params: {
+										timeSlot,
+										appointmentDate,
+										serviceName,
+										barberName,
+										amount,
+									}
+								});
+								return true; // Navigation successful
+							} else {
+								console.log('Navigation not ready yet, retrying...');
+								return false; // Navigation failed, will retry
+							}
 						} catch (navError) {
 							console.error('Global navigation error in success handler:', navError);
 							// Fallback to alert if navigation fails
@@ -222,8 +274,22 @@ function RootLayoutNav() {
 								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
 								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
 							);
+							return true; // Don't retry after fallback
 						}
-					}, 100);
+					};
+					
+					// Try navigation immediately
+					if (!attemptNavigation()) {
+						// If failed, retry with increasing delays
+						const retryDelays = [500, 1000, 2000];
+						retryDelays.forEach((delay, index) => {
+							setTimeout(() => {
+								if (!attemptNavigation()) {
+									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
+								}
+							}, delay);
+						});
+					}
 				} else {
 					// Navigate to failed screen with error details
 					const appointmentDate = urlObj.searchParams.get('appointmentDate');
@@ -241,20 +307,27 @@ function RootLayoutNav() {
 						errorMessage,
 					});
 					
-					// Add a small delay to ensure navigation is ready
-					setTimeout(() => {
+					// Wait for navigation to be ready and user to be authenticated
+					const attemptNavigation = () => {
 						try {
-							router.replace({
-								pathname: '/payment/failed',
-								params: {
-									timeSlot,
-									appointmentDate,
-									serviceName,
-									barberName,
-									amount,
-									errorMessage,
-								}
-							});
+							// Check if user is authenticated and navigation is ready
+							if (user && !isLoading) {
+								router.replace({
+									pathname: '/payment/failed',
+									params: {
+										timeSlot,
+										appointmentDate,
+										serviceName,
+										barberName,
+										amount,
+										errorMessage,
+									}
+								});
+								return true; // Navigation successful
+							} else {
+								console.log('Navigation not ready yet, retrying...');
+								return false; // Navigation failed, will retry
+							}
 						} catch (navError) {
 							console.error('Global navigation error in failure handler:', navError);
 							// Fallback to alert if navigation fails
@@ -263,25 +336,41 @@ function RootLayoutNav() {
 								errorMessage,
 								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
 							);
+							return true; // Don't retry after fallback
 						}
-					}, 100);
+					};
+					
+					// Try navigation immediately
+					if (!attemptNavigation()) {
+						// If failed, retry with increasing delays
+						const retryDelays = [500, 1000, 2000];
+						retryDelays.forEach((delay, index) => {
+							setTimeout(() => {
+								if (!attemptNavigation()) {
+									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
+								}
+							}, delay);
+						});
+					}
 				}
 			}
 		};
 
 		const subscription = Linking.addEventListener('url', ({ url }) => {
+			console.log('🔗 Expo Linking URL event received:', url);
 			handleUrl(url);
 		});
 
 		// Check if app was opened from a URL
 		Linking.getInitialURL().then((url) => {
 			if (url) {
+				console.log('🔗 Expo Linking initial URL:', url);
 				handleUrl(url);
 			}
 		});
 
 		return () => subscription?.remove();
-	}, [router]);
+	}, [router, user, isLoading]);
 
 	if (isLoading && !showFallback) {
 		console.log('Showing LoadingScreen');
@@ -302,6 +391,11 @@ function RootLayoutNav() {
 					<Stack.Screen name="auth/welcome" options={{ headerShown: false }} />
 					<Stack.Screen name="auth/login" options={{ headerShown: false }} />
 					<Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+					{/* Payment screens available even when not authenticated for deep link handling */}
+					<Stack.Screen name="payment/success" options={{ headerShown: false }} />
+					<Stack.Screen name="payment/failed" options={{ headerShown: false }} />
+					<Stack.Screen name="payment/test" options={{ headerShown: false }} />
+					<Stack.Screen name="payment/debug" options={{ headerShown: false }} />
 				</Stack>
 			</ThemeProvider>
 		);

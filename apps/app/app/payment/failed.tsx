@@ -50,12 +50,6 @@ export default function PaymentFailedScreen() {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
             <View style={styles.content}>
-                {/* Error Message */}
-                <Text style={styles.title}>Pago Fallido</Text>
-                <Text style={styles.subtitle}>
-                    No se pudo procesar tu pago. Tu cita no ha sido reservada.
-                </Text>
-
                 {/* Error Details */}
                 {params.errorMessage && (
                     <View style={styles.errorContainer}>
@@ -105,16 +99,8 @@ export default function PaymentFailedScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleTryAgain}>
-                        <Text style={styles.primaryButtonText}>Intentar Nuevamente</Text>
-                    </TouchableOpacity>
-
                     <TouchableOpacity style={styles.secondaryButton} onPress={handleGoHome}>
                         <Text style={styles.secondaryButtonText}>Ir al Inicio</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.supportButton} onPress={handleContactSupport}>
-                        <Text style={styles.supportButtonText}>Contactar Soporte</Text>
                     </TouchableOpacity>
                 </View>
             </View>
