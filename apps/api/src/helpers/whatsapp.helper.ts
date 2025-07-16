@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import winstonLogger from './logger.js';
+import { formatPhoneForTwilio } from './phone.helper.js';
 
 // Initialize Twilio client
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -33,22 +34,27 @@ export async function sendWhatsappReminder(to: string, message: string): Promise
   error?: string;
 }> {
   try {
-    // Validate phone number format
-    if (!to.startsWith('+')) {
+    // Format phone number for Twilio compatibility
+    const phoneResult = formatPhoneForTwilio(to);
+    if (!phoneResult.isValid) {
       return {
         success: false,
-        error: 'Phone number must start with +'
+        error: phoneResult.error || 'Invalid phone number format'
       };
     }
+    
+    const formattedPhone = phoneResult.formatted;
 
     // Format the "to" number for WhatsApp
-    const whatsappTo = `whatsapp:${to}`;
+    const whatsappTo = `whatsapp:${formattedPhone}`;
     const whatsappFrom = `whatsapp:${whatsappNumber}`;
 
     winstonLogger.info('Sending WhatsApp message', {
       to: whatsappTo,
       from: whatsappFrom,
-      messageLength: message.length
+      messageLength: message.length,
+      originalPhone: to,
+      formattedPhone: formattedPhone
     });
 
     const twilioMessage = await client.messages.create({

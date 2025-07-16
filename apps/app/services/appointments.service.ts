@@ -68,11 +68,51 @@ export class AppointmentsService {
       
       console.log('Sending appointment data to API:', appointmentData);
       
-      return await apiClient.post<Appointment>('/appointments', appointmentData);
+      const response = await apiClient.post<Appointment>('/appointments', appointmentData);
+      
+      if (!response.success) {
+        // Handle specific error cases
+        const errorMessage = response.error || 'Error al crear la cita';
+        
+        if (errorMessage.includes('no encontrado')) {
+          return {
+            success: false,
+            error: 'Datos no encontrados. Por favor, verifica tu sesión e intenta nuevamente.',
+          };
+        } else if (errorMessage.includes('no está disponible')) {
+          return {
+            success: false,
+            error: 'El horario seleccionado ya no está disponible. Por favor, selecciona otro horario.',
+          };
+        } else if (errorMessage.includes('Formato de fecha inválido')) {
+          return {
+            success: false,
+            error: 'Formato de fecha incorrecto. Por favor, intenta nuevamente.',
+          };
+        } else if (errorMessage.includes('Campos requeridos faltantes')) {
+          return {
+            success: false,
+            error: 'Faltan datos requeridos. Por favor, completa todos los campos.',
+          };
+        } else if (errorMessage.includes('Error interno del servidor')) {
+          return {
+            success: false,
+            error: 'Error del servidor. Por favor, intenta más tarde.',
+          };
+        }
+        
+        return {
+          success: false,
+          error: errorMessage,
+        };
+      }
+      
+      return response;
     } catch (error) {
+      console.error('Error creating appointment:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create appointment',
+        error: error instanceof Error ? error.message : 'Error al crear la cita. Por favor, intenta nuevamente.',
       };
     }
   }

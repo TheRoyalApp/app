@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { sendAppointmentConfirmation, sendAppointmentReminder, checkAndSendReminders, testWhatsAppMessage } from './notifications.controller.js';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { testWhatsAppConnection } from '../helpers/whatsapp.helper.js';
+import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
 
 const notificationsRoute = new Hono();
 
@@ -34,17 +35,20 @@ notificationsRoute.post('/test-message', async (c) => {
       return c.json(errorResponse(400, 'Missing phoneNumber or message'), 400);
     }
     
-    if (!phoneNumber.match(/^\+[1-9]\d{1,14}$/)) {
-      return c.json(errorResponse(400, 'Phone number must be in international format (e.g., +1234567890)'), 400);
+    // Format phone number for Twilio compatibility
+    const phoneResult = formatPhoneForTwilio(phoneNumber);
+    if (!phoneResult.isValid) {
+      return c.json(errorResponse(400, phoneResult.error || 'Invalid phone number format'), 400);
     }
     
-    const result = await testWhatsAppMessage(phoneNumber, message);
+    const result = await testWhatsAppMessage(phoneResult.formatted, message);
     
     if (result.success) {
       return c.json(successResponse(200, {
         message: 'Test message sent successfully',
         messageId: result.messageId,
-        phoneNumber
+        phoneNumber: phoneResult.formatted,
+        originalPhone: phoneNumber
       }));
     } else {
       return c.json(errorResponse(400, 'Failed to send test message', result.error), 400);

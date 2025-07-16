@@ -118,20 +118,42 @@ export async function getAvailability(barberId: string, date: string) {
   try {
     const db = await getDatabase();
 
+    // Validate barber exists
+    const barber = await db.select().from(users).where(eq(users.id, barberId)).limit(1);
+    if (barber.length === 0) {
+      res.error = 'Barbero no encontrado';
+      return res;
+    }
+
     // Convert dd/mm/yyyy to Date object
     const dateParts = date.split('/');
     if (dateParts.length !== 3) {
-      res.error = 'Invalid date format. Expected dd/mm/yyyy';
+      res.error = 'Formato de fecha inválido. Se espera dd/mm/yyyy';
       return res;
     }
     
     const [day, month, year] = dateParts;
     if (!day || !month || !year) {
-      res.error = 'Invalid date format. Expected dd/mm/yyyy';
+      res.error = 'Formato de fecha inválido. Se espera dd/mm/yyyy';
       return res;
     }
     
     const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    
+    // Check if date is valid
+    if (isNaN(targetDate.getTime())) {
+      res.error = 'Fecha inválida';
+      return res;
+    }
+    
+    // Check if date is in the past
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (targetDate < today) {
+      res.error = 'No se pueden consultar horarios para fechas pasadas';
+      return res;
+    }
+    
     const dayOfWeek = getDayOfWeek(targetDate);
 
     // Debug logs
@@ -213,7 +235,7 @@ export async function getAvailability(barberId: string, date: string) {
     return res;
   } catch (error) {
     console.error('Error getting availability:', error);
-    res.error = 'Internal server error';
+    res.error = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.';
     return res;
   }
 }

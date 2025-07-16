@@ -22,6 +22,7 @@ import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/components/auth/AuthContext';
 import { AuthService } from '@/services';
+import { formatPhoneAsTyping, isValidPhoneNumber } from '@/helpers/phoneFormatter';
 
 export default function ProfileScreen() {
 	const { user, signOut, refreshUser } = useAuth();
@@ -67,6 +68,12 @@ export default function ProfileScreen() {
 
 	const handleSave = async () => {
 		if (!user) return;
+
+		// Validate phone number format for Twilio compatibility
+		if (!isValidPhoneNumber(userData.phone)) {
+			Alert.alert('Error', 'Por favor ingresa un número de teléfono válido en formato internacional (ej: +1234567890)');
+			return;
+		}
 
 		try {
 			setIsLoading(true);
@@ -243,15 +250,27 @@ export default function ProfileScreen() {
 									Número de Teléfono
 								</ThemeText>
 								{isEditing ? (
-									<TextInput
-										style={styles.textInput}
-										value={userData.phone}
-										onChangeText={text =>
-											setUserData({ ...userData, phone: text })
-										}
-										placeholderTextColor={Colors.dark.textLight}
-										keyboardType="phone-pad"
-									/>
+									<>
+										<TextInput
+											style={styles.textInput}
+											value={userData.phone}
+											onChangeText={text =>
+												setUserData({ ...userData, phone: formatPhoneAsTyping(text) })
+											}
+											placeholder="+1 (234) 567-8900"
+											placeholderTextColor={Colors.dark.textLight}
+											keyboardType="phone-pad"
+										/>
+										{/* Helper and warning text for phone format */}
+										<ThemeText style={styles.helperText}>
+											Incluye el código de país, por ejemplo: +1 234 567 8900
+										</ThemeText>
+										{userData.phone.length > 0 && !isValidPhoneNumber(userData.phone) && (
+											<ThemeText style={styles.warningText}>
+												Formato inválido. Usa el formato internacional: +1 234 567 8900
+											</ThemeText>
+										)}
+									</>
 								) : (
 									<View style={styles.displayContainer}>
 										<ThemeText style={styles.displayText}>
@@ -270,31 +289,13 @@ export default function ProfileScreen() {
 							<ThemeText style={styles.cardTitle}>Configuración</ThemeText>
 						</View>
 
-						<TouchableOpacity
-							style={styles.menuItem}
-							onPress={() => setShowNotificationsModal(true)}
-						>
-							<View style={styles.menuItemLeft}>
-								<View style={[styles.menuIcon, { backgroundColor: '#ffcc00' }]}>
-									<Ionicons
-										name="notifications-outline"
-										size={20}
-										color={Colors.dark.background}
-									/>
-								</View>
-								<View style={styles.menuText}>
-									<ThemeText style={styles.menuTitle}>Notificaciones</ThemeText>
-									<ThemeText style={styles.menuSubtitle}>
-										Gestionar preferencias de notificaciones
-									</ThemeText>
-								</View>
-							</View>
-							<Ionicons
-								name="chevron-forward"
-								size={20}
-								color={Colors.dark.textLight}
-							/>
-						</TouchableOpacity>
+						{/* Disclaimer */}
+						<View style={styles.disclaimerContainer}>
+							<Ionicons name="information-circle" size={20} color={Colors.dark.primary} />
+							<ThemeText style={styles.disclaimerText}>
+								Los recordatorios de citas se envían automáticamente vía WhatsApp 15 minutos antes de tu cita programada.
+							</ThemeText>
+						</View>
 
 						<TouchableOpacity
 							style={styles.menuItem}
@@ -355,110 +356,6 @@ export default function ProfileScreen() {
 							<ThemeText style={styles.modalSaveText}>Guardar</ThemeText>
 						</TouchableOpacity>
 					</View>
-
-					<ScrollView style={styles.modalContent}>
-						<View style={styles.notificationSection}>
-							<View style={styles.notificationItem}>
-								<View style={styles.notificationInfo}>
-									<ThemeText style={styles.notificationTitle}>
-										Notificaciones Push
-									</ThemeText>
-									<ThemeText style={styles.notificationSubtitle}>
-										Recibir notificaciones en el dispositivo
-									</ThemeText>
-								</View>
-								<Switch
-									value={notificationSettings.pushNotifications}
-									onValueChange={value =>
-										setNotificationSettings({
-											...notificationSettings,
-											pushNotifications: value,
-										})
-									}
-									trackColor={{
-										false: Colors.dark.gray,
-										true: Colors.dark.primary,
-									}}
-									thumbColor={Colors.dark.background}
-								/>
-							</View>
-
-							<View style={styles.notificationItem}>
-								<View style={styles.notificationInfo}>
-									<ThemeText style={styles.notificationTitle}>
-										Notificaciones SMS
-									</ThemeText>
-									<ThemeText style={styles.notificationSubtitle}>
-										Recibir notificaciones por mensaje de texto
-									</ThemeText>
-								</View>
-								<Switch
-									value={notificationSettings.smsNotifications}
-									onValueChange={value =>
-										setNotificationSettings({
-											...notificationSettings,
-											smsNotifications: value,
-										})
-									}
-									trackColor={{
-										false: Colors.dark.gray,
-										true: Colors.dark.primary,
-									}}
-									thumbColor={Colors.dark.background}
-								/>
-							</View>
-
-							<View style={styles.notificationItem}>
-								<View style={styles.notificationInfo}>
-									<ThemeText style={styles.notificationTitle}>
-										Recordatorios de Citas
-									</ThemeText>
-									<ThemeText style={styles.notificationSubtitle}>
-										Recordatorios antes de tus citas
-									</ThemeText>
-								</View>
-								<Switch
-									value={notificationSettings.appointmentReminders}
-									onValueChange={value =>
-										setNotificationSettings({
-											...notificationSettings,
-											appointmentReminders: value,
-										})
-									}
-									trackColor={{
-										false: Colors.dark.gray,
-										true: Colors.dark.primary,
-									}}
-									thumbColor={Colors.dark.background}
-								/>
-							</View>
-
-							<View style={styles.notificationItem}>
-								<View style={styles.notificationInfo}>
-									<ThemeText style={styles.notificationTitle}>
-										Ofertas Promocionales
-									</ThemeText>
-									<ThemeText style={styles.notificationSubtitle}>
-										Recibir ofertas y descuentos especiales
-									</ThemeText>
-								</View>
-								<Switch
-									value={notificationSettings.promotionalOffers}
-									onValueChange={value =>
-										setNotificationSettings({
-											...notificationSettings,
-											promotionalOffers: value,
-										})
-									}
-									trackColor={{
-										false: Colors.dark.gray,
-										true: Colors.dark.primary,
-									}}
-									thumbColor={Colors.dark.background}
-								/>
-							</View>
-						</View>
-					</ScrollView>
 				</SafeAreaView>
 			</Modal>
 
@@ -739,6 +636,23 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: Colors.dark.textLight,
 	},
+	disclaimerContainer: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		backgroundColor: Colors.dark.background,
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: Colors.dark.primary,
+	},
+	disclaimerText: {
+		fontSize: 14,
+		color: Colors.dark.textLight,
+		marginLeft: 8,
+		flex: 1,
+		lineHeight: 20,
+	},
 	// Logout Modal Styles
 	overlay: {
 		flex: 1,
@@ -810,5 +724,17 @@ const styles = StyleSheet.create({
 	},
 	logoutButtonDisabled: {
 		opacity: 0.6,
+	},
+	helperText: {
+		fontSize: 12,
+		color: Colors.dark.textLight,
+		marginTop: 4,
+		marginLeft: 2,
+	},
+	warningText: {
+		fontSize: 12,
+		color: '#ff3b30',
+		marginTop: 2,
+		marginLeft: 2,
 	},
 });

@@ -94,7 +94,23 @@ export async function listServices() {
     return res;
   } catch (error) {
     console.error('Error listing services:', error);
-    res.error = 'Internal server error';
+    
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        res.error = 'Database schema error. Please contact administrator.';
+        return res;
+      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+        res.error = 'Database connection error. Please try again later.';
+        return res;
+      } else if (error.message.includes('permission') || error.message.includes('access')) {
+        res.error = 'Database access error. Please contact administrator.';
+        return res;
+      }
+    }
+    
+    // Generic error message to prevent exposing internal details
+    res.error = 'Error al cargar servicios. Por favor, intenta más tarde.';
     return res;
   }
 }
@@ -124,6 +140,21 @@ export async function getServiceById(id: string) {
     return res;
   } catch (error) {
     console.error('Error getting service:', error);
+    
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        res.error = 'Database schema error. Please contact administrator.';
+        return res;
+      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+        res.error = 'Database connection error. Please try again later.';
+        return res;
+      } else if (error.message.includes('permission') || error.message.includes('access')) {
+        res.error = 'Database access error. Please contact administrator.';
+        return res;
+      }
+    }
+    
     res.error = 'Internal server error';
     return res;
   }
@@ -198,6 +229,21 @@ export async function updateService(id: string, updateData: Partial<Service>) {
     return res;
   } catch (error) {
     console.error('Error updating service:', error);
+    
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        res.error = 'Database schema error. Please contact administrator.';
+        return res;
+      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+        res.error = 'Database connection error. Please try again later.';
+        return res;
+      } else if (error.message.includes('permission') || error.message.includes('access')) {
+        res.error = 'Database access error. Please contact administrator.';
+        return res;
+      }
+    }
+    
     res.error = 'Internal server error';
     return res;
   }
@@ -248,7 +294,22 @@ export async function deleteService(id: string) {
     return res;
   } catch (error) {
     console.error('Error deleting service:', error);
+    
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        res.error = 'Database schema error. Please contact administrator.';
+        return res;
+      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+        res.error = 'Database connection error. Please try again later.';
+        return res;
+      } else if (error.message.includes('permission') || error.message.includes('access')) {
+        res.error = 'Database access error. Please contact administrator.';
+        return res;
+      }
+    }
+    
     res.error = 'Internal server error';
     return res;
   }
-} 
+}

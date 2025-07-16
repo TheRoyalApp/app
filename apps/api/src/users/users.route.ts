@@ -67,18 +67,18 @@ usersRouter.get('/staff', async (c: Context) => {
         const { data, error } = await getAllUsers('staff');
 
         if (error) {
-            return c.json(errorResponse(404, 'No staff users found'), 404);
+            return c.json(errorResponse(404, 'No se encontraron barberos en el sistema'), 404);
         }
 
         if (!data) {
-            return c.json(errorResponse(404, 'No staff users found'), 404);
+            return c.json(errorResponse(404, 'No se encontraron barberos en el sistema'), 404);
         }
 
         // Ensure data is an array (getAllUsers returns User[] but UserResponse.data can be User | User[])
         const staffUsers = Array.isArray(data) ? data : [data];
 
         if (staffUsers.length === 0) {
-            return c.json(errorResponse(404, 'No staff users found'), 404);
+            return c.json(errorResponse(404, 'No hay barberos disponibles en el sistema. Por favor, contacta al administrador.'), 404);
         }
 
         // Remove sensitive information before sending to client
@@ -93,7 +93,7 @@ usersRouter.get('/staff', async (c: Context) => {
         return c.json(successResponse(200, publicStaffData), 200);
     } catch (error) {
         console.error('Error fetching staff users:', error);
-        return c.json(errorResponse(500, 'Failed to fetch staff users'), 500);
+        return c.json(errorResponse(500, 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'), 500);
     }
 });
 

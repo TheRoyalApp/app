@@ -1,9 +1,26 @@
 import { z } from 'zod';
+import { formatPhoneForTwilio } from './phone.helper.js';
 
 // Base schemas
 export const emailSchema = z.string().email('Invalid email format');
 export const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
-export const phoneSchema = z.string().regex(/^\+?[\d\s\-\(\)]{7,20}$/, 'Invalid phone number format');
+
+// Phone schema with Twilio compatibility
+export const phoneSchema = z.string()
+  .min(1, 'Phone number is required')
+  .transform((val) => {
+    const result = formatPhoneForTwilio(val);
+    if (!result.isValid) {
+      throw new Error(result.error || 'Invalid phone number format');
+    }
+    return result.formatted;
+  })
+  .refine((val) => {
+    const result = formatPhoneForTwilio(val);
+    return result.isValid;
+  }, {
+    message: 'Phone number must be in international format (e.g., +1234567890)'
+  });
 
 // User schemas
 export const createUserSchema = z.object({

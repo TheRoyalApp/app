@@ -42,8 +42,10 @@ export default function AppointmentScreen() {
 	const [selectedTime, setSelectedTime] = useState<string>('');
 	const [paymentType, setPaymentType] = useState<'full' | 'advance'>('full');
 	const [isLoading, setIsLoading] = useState(true);
+	const [isLoadingBarbers, setIsLoadingBarbers] = useState(false);
 	const [isBooking, setIsBooking] = useState(false);
 	const [selectedServiceName, setSelectedServiceName] = useState<string | null>(null);
+	const [barberError, setBarberError] = useState<string | null>(null);
 
 	
 	useEffect(() => {
@@ -136,75 +138,212 @@ export default function AppointmentScreen() {
 		}
 	};
 
+	const retryLoadServices = async () => {
+		try {
+			setServices([]); // Clear existing services
+			await loadServices();
+		} catch (error) {
+			console.error('Error retrying services load:', error);
+		}
+	};
+
+	const retryLoadBarbers = async () => {
+		try {
+			setBarbers([]); // Clear existing barbers
+			setBarberError(null); // Clear any previous errors
+			await loadBarbers();
+		} catch (error) {
+			console.error('Error retrying barbers load:', error);
+		}
+	};
+
 	const loadServices = async () => {
 		try {
-			const response = await ServicesService.getActiveServices();
+			// Reset services and error state
+			setServices([]);
 			
-			if (response.success && response.data) {
-				setServices(response.data);
-			} else {
-				console.error('Failed to load services:', response.error);
+			// Use a faster request without retry logic for better UX
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			
+			try {
+				const response = await fetch(`${API_CONFIG.baseURL}/services`, {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json',
+						'Accept': 'application/json',
+					},
+					signal: controller.signal,
+				});
+				
+				clearTimeout(timeoutId);
+				
+				if (!response.ok) {
+					let errorMessage = `HTTP ${response.status}`;
+					try {
+						const errorData = await response.json();
+						errorMessage = errorData.message || errorData.error || errorMessage;
+					} catch (parseError) {
+						// If we can't parse the error response, use the status text
+						errorMessage = response.statusText || errorMessage;
+					}
+					throw new Error(errorMessage);
+				}
+				
+				const data = await response.json();
+				
+				if (data.success && data.data) {
+					setServices(data.data);
+				} else {
+					console.error('Failed to load services:', data.error);
+					// Don't show alert here, let the fallback UI handle it
+				}
+			} catch (fetchError) {
+				clearTimeout(timeoutId);
+				throw fetchError;
 			}
 		} catch (error) {
 			console.error('Error loading services:', error);
+			// Don't show alert here, let the fallback UI handle it
+			// Log the full error for debugging
+			if (error instanceof Error) {
+				console.log('Services error details:', {
+					name: error.name,
+					message: error.message,
+					stack: error.stack
+				});
+			}
 		}
 	};
 
 	const loadBarbers = async () => {
 		try {
+			setIsLoadingBarbers(true);
+			setBarberError(null);
 			console.log('Loading barbers...');
-			// Use the new public staff endpoint
-			const response = await apiClient.get('/users/staff');
-			console.log('Barbers API response:', response);
 			
-			if (response.success && response.data && Array.isArray(response.data)) {
-				console.log('Staff users found:', response.data);
+			// Use a faster request without retry logic for better UX
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			
+			try {
+				const response = await fetch(`${API_CONFIG.baseURL}/users/staff`, {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json',
+						'Accept': 'application/json',
+					},
+					signal: controller.signal,
+				});
 				
-				const mappedBarbers = response.data.map((user: any) => ({
-					id: user.id,
-					name: `${user.firstName} ${user.lastName}`,
-					email: user.email,
-					firstName: user.firstName,
-					lastName: user.lastName
-				}));
+				clearTimeout(timeoutId);
 				
-				console.log('Mapped barbers:', mappedBarbers);
-				setBarbers(mappedBarbers);
-				
-				// Auto-select Carlos Rodriguez if available
-				const carlos = response.data.find((user: any) => user.email === 'barber@theroyalbarber.com');
-				if (carlos) {
-					const selectedCarlos = {
-						id: carlos.id,
-						name: `${carlos.firstName} ${carlos.lastName}`,
-						email: carlos.email,
-						firstName: carlos.firstName,
-						lastName: carlos.lastName
-					};
-					console.log('Auto-selecting Carlos:', selectedCarlos);
-					setSelectedBarber(selectedCarlos);
-				} else if (response.data.length > 0) {
-					// If Carlos not found, select the first available barber
-					const firstBarber = response.data[0];
-					const selectedFirstBarber = {
-						id: firstBarber.id,
-						name: `${firstBarber.firstName} ${firstBarber.lastName}`,
-						email: firstBarber.email,
-						firstName: firstBarber.firstName,
-						lastName: firstBarber.lastName
-					};
-					console.log('Auto-selecting first barber:', selectedFirstBarber);
-					setSelectedBarber(selectedFirstBarber);
+				if (!response.ok) {
+					let errorMessage = `HTTP ${response.status}`;
+					try {
+						const errorData = await response.json();
+						errorMessage = errorData.message || errorData.error || errorMessage;
+					} catch (parseError) {
+						// If we can't parse the error response, use the status text
+						errorMessage = response.statusText || errorMessage;
+					}
+					throw new Error(errorMessage);
 				}
-			} else {
-				console.log('API response failed or no data');
-				setBarbers([]);
-				setSelectedBarber(null);
+				
+				const data = await response.json();
+				
+				if (data.success && data.data && Array.isArray(data.data)) {
+					console.log('Staff users found:', data.data);
+					
+					if (data.data.length === 0) {
+						setBarberError('No hay barberos disponibles en el sistema');
+						setBarbers([]);
+						setSelectedBarber(null);
+						return;
+					}
+					
+					const mappedBarbers = data.data.map((user: any) => ({
+						id: user.id,
+						name: `${user.firstName} ${user.lastName}`,
+						email: user.email,
+						firstName: user.firstName,
+						lastName: user.lastName
+					}));
+					
+					console.log('Mapped barbers:', mappedBarbers);
+					setBarbers(mappedBarbers);
+					
+					// Auto-select Carlos Rodriguez if available
+					const carlos = data.data.find((user: any) => user.email === 'barber@theroyalbarber.com');
+					if (carlos) {
+						const selectedCarlos = {
+							id: carlos.id,
+							name: `${carlos.firstName} ${carlos.lastName}`,
+							email: carlos.email,
+							firstName: carlos.firstName,
+							lastName: carlos.lastName
+						};
+						console.log('Auto-selecting Carlos:', selectedCarlos);
+						setSelectedBarber(selectedCarlos);
+					} else if (data.data.length > 0) {
+						// If Carlos not found, select the first available barber
+						const firstBarber = data.data[0];
+						const selectedFirstBarber = {
+							id: firstBarber.id,
+							name: `${firstBarber.firstName} ${firstBarber.lastName}`,
+							email: firstBarber.email,
+							firstName: firstBarber.firstName,
+							lastName: firstBarber.lastName
+						};
+						console.log('Auto-selecting first barber:', selectedFirstBarber);
+						setSelectedBarber(selectedFirstBarber);
+					}
+				} else {
+					console.log('API response failed or no data');
+					setBarberError('No se pudieron cargar los barberos. Por favor, intenta nuevamente.');
+					setBarbers([]);
+					setSelectedBarber(null);
+				}
+			} catch (fetchError) {
+				clearTimeout(timeoutId);
+				throw fetchError;
 			}
 		} catch (error) {
 			console.error('Error loading barbers:', error);
+			
+			// Log detailed error information for debugging
+			if (error instanceof Error) {
+				console.log('Barbers error details:', {
+					name: error.name,
+					message: error.message,
+					stack: error.stack
+				});
+			}
+			
+			if (error instanceof Error) {
+				if (error.name === 'AbortError') {
+					setBarberError('Tiempo de espera agotado. Por favor, intenta nuevamente.');
+				} else if (error.message.includes('Network') || error.message.includes('fetch')) {
+					setBarberError('Error de conexión. Por favor, verifica tu internet e intenta nuevamente.');
+				} else if (error.message.includes('404') || error.message.includes('not found')) {
+					setBarberError('No hay barberos disponibles en el sistema. Por favor, contacta al administrador.');
+				} else if (error.message.includes('500') || error.message.includes('server')) {
+					setBarberError('Error del servidor. Por favor, intenta más tarde.');
+				} else {
+					// Limit error message length to prevent truncation
+					const errorMsg = error.message.length > 50 ? 
+						error.message.substring(0, 50) + '...' : 
+						error.message;
+					setBarberError(`Error al cargar barberos: ${errorMsg}`);
+				}
+			} else {
+				setBarberError('Error de conexión. Por favor, verifica tu internet e intenta nuevamente.');
+			}
+			
 			setBarbers([]);
 			setSelectedBarber(null);
+		} finally {
+			setIsLoadingBarbers(false);
 		}
 	};
 
@@ -334,8 +473,19 @@ export default function AppointmentScreen() {
 						No hay datos disponibles
 					</ThemeText>
 					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
-						No se pudieron cargar los servicios o barberos.
+						No se pudieron cargar los servicios o barberos. Esto puede deberse a:
 					</ThemeText>
+					<View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+							• Problemas de conexión a internet
+						</ThemeText>
+						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+							• Servicios temporalmente no disponibles
+						</ThemeText>
+						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+							• No hay barberos activos en el sistema
+						</ThemeText>
+					</View>
 					<Button onPress={() => loadInitialData()} style={{ marginBottom: 10 }}>
 						Reintentar
 					</Button>
@@ -347,13 +497,94 @@ export default function AppointmentScreen() {
 		);
 	}
 
+	// Show specific error when only services are missing
+	if (services.length === 0 && barbers.length > 0) {
+		return (
+			<ScreenWrapper>
+				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+						No hay servicios disponibles
+					</ThemeText>
+					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
+						No se pudieron cargar los servicios. Por favor, contacta al administrador o intenta más tarde.
+					</ThemeText>
+					<Button onPress={() => retryLoadServices()} style={{ marginBottom: 10 }}>
+						Reintentar
+					</Button>
+					<Button secondary onPress={() => router.back()}>
+						Volver
+					</Button>
+				</View>
+			</ScreenWrapper>
+		);
+	}
+
+	// Show specific error when only barbers are missing
+	if (barbers.length === 0 && services.length > 0) {
+		return (
+			<ScreenWrapper>
+				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+						No hay barberos disponibles
+					</ThemeText>
+					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
+						{barberError || 'No hay barberos activos en el sistema. Esto puede deberse a:'}
+					</ThemeText>
+					{!barberError && (
+						<View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+								• No hay barberos registrados en el sistema
+							</ThemeText>
+							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+								• Los barberos no están activos
+							</ThemeText>
+							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+								• Problemas de configuración del sistema
+							</ThemeText>
+						</View>
+					)}
+					<Button onPress={() => retryLoadBarbers()} style={{ marginBottom: 10 }} disabled={isLoadingBarbers}>
+						{isLoadingBarbers ? 'Cargando...' : 'Reintentar'}
+					</Button>
+					<Button secondary onPress={() => router.back()}>
+						Volver
+					</Button>
+				</View>
+			</ScreenWrapper>
+		);
+	}
+
 	return (
 		<ScreenWrapper showBottomFade={true} showTopFade={false}>
+			{/* Header with back button */}
+			<View style={{ 
+				flexDirection: 'row', 
+				alignItems: 'center', 
+				paddingHorizontal: 20, 
+				paddingVertical: 15,
+				borderBottomWidth: 1,
+				borderBottomColor: Colors.dark.gray
+			}}>
+				<Pressable 
+					onPress={() => router.back()}
+					style={{ 
+						padding: 8,
+						marginRight: 15
+					}}
+				>
+					<ThemeText style={{ fontSize: 18 }}>←</ThemeText>
+				</Pressable>
+				<ThemeText style={{ fontSize: 20, fontWeight: 'bold' }}>
+					Agendar Cita
+				</ThemeText>
+			</View>
+			
 			<ScrollView>
 				<Container style={{ paddingBottom: 30 }}>
-					<ThemeText style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
+					{/* Remove the duplicate title since we now have a header */}
+					{/* <ThemeText style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
 						Agendar Cita
-					</ThemeText>
+					</ThemeText> */}
 
 					{/* Barber Selection */}
 					<View style={{ marginBottom: 30 }}>
@@ -372,20 +603,44 @@ export default function AppointmentScreen() {
 								borderRadius: 10,
 								alignItems: 'center'
 							}}>
-								<ThemeText style={{ 
-									textAlign: 'center', 
-									color: Colors.dark.textLight,
-									marginBottom: 5
-								}}>
-									No hay barberos disponibles
-								</ThemeText>
-								<ThemeText style={{ 
-									textAlign: 'center', 
-									color: Colors.dark.textLight,
-									fontSize: 12
-								}}>
-									Por favor contacta al administrador
-								</ThemeText>
+								{isLoadingBarbers ? (
+									<>
+										<ActivityIndicator size="small" color={Colors.dark.primary} style={{ marginBottom: 10 }} />
+										<ThemeText style={{ 
+											textAlign: 'center', 
+											color: Colors.dark.textLight,
+											marginBottom: 5
+										}}>
+											Cargando barberos...
+										</ThemeText>
+									</>
+								) : (
+									<>
+										<ThemeText style={{ 
+											textAlign: 'center', 
+											color: Colors.dark.textLight,
+											marginBottom: 5
+										}}>
+											{barberError || 'No hay barberos disponibles'}
+										</ThemeText>
+										<ThemeText style={{ 
+											textAlign: 'center', 
+											color: Colors.dark.textLight,
+											fontSize: 12,
+											marginBottom: 10
+										}}>
+											Por favor contacta al administrador
+										</ThemeText>
+										<Button 
+											onPress={() => retryLoadBarbers()} 
+											style={{ marginTop: 5 }}
+											secondary
+											disabled={isLoadingBarbers}
+										>
+											{isLoadingBarbers ? 'Cargando...' : 'Reintentar'}
+										</Button>
+									</>
+								)}
 							</View>
 						) : (
 							<ScrollView 

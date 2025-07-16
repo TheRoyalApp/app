@@ -64,25 +64,32 @@ export default function AppointmentDatePicker({
         if (availableSlots.length === 0) {
           Alert.alert(
             'Sin horarios disponibles',
-            'No hay horarios disponibles para la fecha seleccionada. Por favor, selecciona otra fecha.',
+            'No hay horarios disponibles para la fecha seleccionada. Esto puede deberse a:\n\n• El barbero no trabaja en esta fecha\n• Todos los horarios están reservados\n• El horario aún no está configurado\n\nPor favor, selecciona otra fecha.',
             [{ text: 'OK' }]
           )
         }
       } else {
         setAvailability(null)
+        const errorMessage = response.error || 'No se pudieron cargar los horarios disponibles'
         Alert.alert(
-          'Error',
-          'No se pudieron cargar los horarios disponibles. Por favor, intenta con otra fecha.',
-          [{ text: 'OK' }]
+          'Error al cargar horarios',
+          `${errorMessage}. Esto puede deberse a:\n\n• Problemas de conexión\n• El barbero no tiene horarios configurados\n• Error en el servidor\n\nPor favor, intenta con otra fecha o contacta al administrador.`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Reintentar', onPress: () => loadAvailability(date) }
+          ]
         )
       }
     } catch (error) {
       console.error('Error loading availability:', error)
       setAvailability(null)
       Alert.alert(
-        'Error',
-        'Ocurrió un error al cargar los horarios. Por favor, intenta nuevamente.',
-        [{ text: 'OK' }]
+        'Error de conexión',
+        'Ocurrió un error al cargar los horarios. Esto puede deberse a:\n\n• Problemas de conexión a internet\n• Servidor temporalmente no disponible\n• Error en la aplicación\n\nPor favor, verifica tu conexión e intenta nuevamente.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Reintentar', onPress: () => loadAvailability(date) }
+        ]
       )
     } finally {
       setIsLoadingTimes(false)

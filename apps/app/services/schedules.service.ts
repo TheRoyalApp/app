@@ -88,14 +88,50 @@ export class SchedulesService {
         };
       }
 
-             return {
-         success: false,
-         error: response.error || 'Failed to fetch availability',
-       };
-    } catch (error) {
+      // Handle specific error cases
+      const errorMessage = response.error || 'No se pudieron cargar los horarios disponibles';
+      
+      if (errorMessage.includes('not found') || errorMessage.includes('no encontrado')) {
+        return {
+          success: false,
+          error: 'Barbero no encontrado o no tiene horarios configurados.',
+        };
+      } else if (errorMessage.includes('connection') || errorMessage.includes('timeout')) {
+        return {
+          success: false,
+          error: 'Error de conexión. Por favor, verifica tu internet e intenta nuevamente.',
+        };
+      } else if (errorMessage.includes('server') || errorMessage.includes('servidor')) {
+        return {
+          success: false,
+          error: 'Error del servidor. Por favor, intenta más tarde.',
+        };
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch availability',
+        error: errorMessage,
+      };
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Network') || error.message.includes('fetch')) {
+          return {
+            success: false,
+            error: 'Error de conexión. Por favor, verifica tu internet e intenta nuevamente.',
+          };
+        } else if (error.message.includes('timeout')) {
+          return {
+            success: false,
+            error: 'Tiempo de espera agotado. Por favor, intenta nuevamente.',
+          };
+        }
+      }
+      
+      return {
+        success: false,
+        error: 'Error al cargar los horarios. Por favor, intenta nuevamente.',
       };
     }
   }

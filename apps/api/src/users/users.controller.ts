@@ -1,5 +1,7 @@
 import { getDatabase, users } from '../db/connection.js';
 import { eq, and } from 'drizzle-orm';
+import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
+import winstonLogger from '../helpers/logger.js';
 import type { User, UserResponse } from './users.d';
 
 
@@ -9,27 +11,59 @@ export async function getAllUsers(role?: 'customer' | 'staff'): Promise<UserResp
         error: null,
     };
 
-    const db = await getDatabase();
-    
-    // Build query with optional role filter
-    let allUsers;
-    if (role === 'staff') {
-        // For staff role, exclude admin users (staff with isAdmin = true)
-        allUsers = await db.select().from(users).where(
-            and(
-                eq(users.role, role),
-                eq(users.isAdmin, false)
-            )
-        );
-    } else if (role) {
-        allUsers = await db.select().from(users).where(eq(users.role, role));
-    } else {
-        allUsers = await db.select().from(users);
+    try {
+        const db = await getDatabase();
+        
+        // Build query with optional role filter
+        let allUsers;
+        if (role === 'staff') {
+            // For staff role, exclude admin users (staff with isAdmin = true)
+            allUsers = await db.select().from(users).where(
+                and(
+                    eq(users.role, role),
+                    eq(users.isAdmin, false)
+                )
+            );
+        } else if (role) {
+            allUsers = await db.select().from(users).where(eq(users.role, role));
+        } else {
+            allUsers = await db.select().from(users);
+        }
+        
+        if (allUsers.length === 0) {
+            if (role === 'staff') {
+                res.error = 'No hay barberos registrados en el sistema';
+            } else if (role) {
+                res.error = `No se encontraron usuarios con rol '${role}'`;
+            } else {
+                res.error = 'No se encontraron usuarios';
+            }
+            return res;
+        }
+        
+        res.data = allUsers as User[];
+        return res;
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        
+        // Handle specific database errors
+        if (error instanceof Error) {
+            if (error.message.includes('column') && error.message.includes('does not exist')) {
+                res.error = 'Error de configuración de base de datos. Contacta al administrador.';
+                return res;
+            } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+                res.error = 'Error de conexión a la base de datos. Intenta más tarde.';
+                return res;
+            } else if (error.message.includes('permission') || error.message.includes('access')) {
+                res.error = 'Error de acceso a la base de datos. Contacta al administrador.';
+                return res;
+            }
+        }
+        
+        // Generic error message to prevent exposing internal details
+        res.error = 'Error interno del servidor al obtener usuarios';
+        return res;
     }
-    
-    res.data = allUsers as User[];
-
-    return res;
 }
 
 export async function getUserById(id: string): Promise<UserResponse> {
@@ -67,8 +101,24 @@ export async function updateUser(id: string, updateData: Partial<User>): Promise
             return res;
         }
 
+        // Format phone number if it's being updated
+        let formattedUpdateData = { ...updateData };
+        if (updateData.phone) {
+            const phoneResult = formatPhoneForTwilio(updateData.phone);
+            if (!phoneResult.isValid) {
+                winstonLogger.warn('Invalid phone number during user update', { 
+                    userId: id,
+                    phone: updateData.phone, 
+                    error: phoneResult.error 
+                });
+                res.error = phoneResult.error || 'Invalid phone number format';
+                return res;
+            }
+            formattedUpdateData.phone = phoneResult.formatted;
+        }
+
         // Remove sensitive fields that shouldn't be updated directly
-        const { password, refreshToken, ...safeUpdateData } = updateData;
+        const { password, refreshToken, ...safeUpdateData } = formattedUpdateData;
 
         const [updatedUser] = await db
             .update(users)
@@ -83,6 +133,21 @@ export async function updateUser(id: string, updateData: Partial<User>): Promise
         return res;
     } catch (error) {
         console.error('Error updating user:', error);
+        
+        // Handle specific database errors
+        if (error instanceof Error) {
+            if (error.message.includes('column') && error.message.includes('does not exist')) {
+                res.error = 'Error de configuración de base de datos. Contacta al administrador.';
+                return res;
+            } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+                res.error = 'Error de conexión a la base de datos. Intenta más tarde.';
+                return res;
+            } else if (error.message.includes('permission') || error.message.includes('access')) {
+                res.error = 'Error de acceso a la base de datos. Contacta al administrador.';
+                return res;
+            }
+        }
+        
         res.error = 'Failed to update user';
         return res;
     }
@@ -110,6 +175,21 @@ export async function deleteUser(id: string): Promise<UserResponse> {
         return res;
     } catch (error) {
         console.error('Error deleting user:', error);
+        
+        // Handle specific database errors
+        if (error instanceof Error) {
+            if (error.message.includes('column') && error.message.includes('does not exist')) {
+                res.error = 'Error de configuración de base de datos. Contacta al administrador.';
+                return res;
+            } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+                res.error = 'Error de conexión a la base de datos. Intenta más tarde.';
+                return res;
+            } else if (error.message.includes('permission') || error.message.includes('access')) {
+                res.error = 'Error de acceso a la base de datos. Contacta al administrador.';
+                return res;
+            }
+        }
+        
         res.error = 'Failed to delete user';
         return res;
     }

@@ -40,16 +40,23 @@ export async function createAppointment(appointmentData: {
   try {
     const { userId, barberId, serviceId, appointmentDate, timeSlot, notes } = appointmentData;
 
-    // Validate required fields
+    // Validate required fields with specific messages
     if (!userId || !barberId || !serviceId || !appointmentDate || !timeSlot) {
-      res.error = 'Missing required fields';
+      const missingFields = [];
+      if (!userId) missingFields.push('usuario');
+      if (!barberId) missingFields.push('barbero');
+      if (!serviceId) missingFields.push('servicio');
+      if (!appointmentDate) missingFields.push('fecha');
+      if (!timeSlot) missingFields.push('hora');
+      
+      res.error = `Campos requeridos faltantes: ${missingFields.join(', ')}`;
       return res;
     }
 
     // Convert dd/mm/yyyy to Date object for appointment creation
     const targetDate = parseDate(appointmentDate);
     if (!targetDate) {
-      res.error = 'Invalid date format. Expected dd/mm/yyyy';
+      res.error = 'Formato de fecha inválido. Se espera dd/mm/yyyy';
       return res;
     }
 
@@ -57,7 +64,7 @@ export async function createAppointment(appointmentData: {
     const isAvailable = await isTimeSlotAvailable(barberId, appointmentDate, timeSlot);
 
     if (!isAvailable) {
-      res.error = 'Time slot is not available';
+      res.error = 'El horario seleccionado no está disponible. Por favor, selecciona otro horario.';
       return res;
     }
 
@@ -66,21 +73,21 @@ export async function createAppointment(appointmentData: {
     // Validate user exists
     const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (user.length === 0) {
-      res.error = 'User not found';
+      res.error = 'Usuario no encontrado. Por favor, verifica tu sesión e intenta nuevamente.';
       return res;
     }
 
     // Validate barber exists
     const barber = await db.select().from(users).where(eq(users.id, barberId)).limit(1);
     if (barber.length === 0) {
-      res.error = 'Barber not found';
+      res.error = 'Barbero no encontrado. Por favor, selecciona otro barbero.';
       return res;
     }
 
     // Validate service exists
     const service = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
     if (service.length === 0) {
-      res.error = 'Service not found';
+      res.error = 'Servicio no encontrado. Por favor, selecciona otro servicio.';
       return res;
     }
 
@@ -96,7 +103,7 @@ export async function createAppointment(appointmentData: {
     }).returning();
 
     if (!newAppointment[0]) {
-      res.error = 'Failed to create appointment';
+      res.error = 'Error al crear la cita. Por favor, intenta nuevamente.';
       return res;
     }
     
@@ -104,7 +111,7 @@ export async function createAppointment(appointmentData: {
     return res;
   } catch (error) {
     console.error('Error creating appointment:', error);
-    res.error = 'Internal server error';
+    res.error = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.';
     return res;
   }
 }

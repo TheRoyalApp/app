@@ -8,6 +8,7 @@ import { getDatabase } from '../db/connection.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import winstonLogger from '../helpers/logger.js';
+import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
 import type { CreateUserRequest, LoginRequest, RefreshTokenRequest } from './auth.d.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -79,6 +80,16 @@ export async function signup(c: Context) {
       return c.json(errorResponse(409, 'User with this email already exists'), 409);
     }
 
+    // Format phone number for Twilio compatibility
+    const phoneResult = formatPhoneForTwilio(validatedData.phone);
+    if (!phoneResult.isValid) {
+      winstonLogger.warn('Invalid phone number during signup', { 
+        phone: validatedData.phone, 
+        error: phoneResult.error 
+      });
+      return c.json(errorResponse(400, phoneResult.error || 'Invalid phone number format'), 400);
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
@@ -86,13 +97,13 @@ export async function signup(c: Context) {
     const dbRole = validatedData.role === 'admin' ? 'staff' : validatedData.role;
     const isAdmin = validatedData.role === 'admin';
 
-    // Create user
+    // Create user with formatted phone number
     const newUser = await db.insert(users).values({
       email: validatedData.email,
       password: hashedPassword,
       firstName: validatedData.firstName,
       lastName: validatedData.lastName,
-      phone: validatedData.phone,
+      phone: phoneResult.formatted,
       role: dbRole,
       isAdmin: isAdmin
     }).returning();

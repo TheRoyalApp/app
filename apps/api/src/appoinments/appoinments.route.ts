@@ -39,26 +39,44 @@ appointmentsRouter.post('/', async (c: Context) => {
         const appointmentData = await c.req.json();
         
         if (!appointmentData.userId || !appointmentData.barberId || !appointmentData.serviceId || !appointmentData.appointmentDate || !appointmentData.timeSlot) {
-            return c.json(errorResponse(400, 'Missing required fields'), 400);
+            const missingFields = [];
+            if (!appointmentData.userId) missingFields.push('userId');
+            if (!appointmentData.barberId) missingFields.push('barberId');
+            if (!appointmentData.serviceId) missingFields.push('serviceId');
+            if (!appointmentData.appointmentDate) missingFields.push('appointmentDate');
+            if (!appointmentData.timeSlot) missingFields.push('timeSlot');
+            
+            return c.json(errorResponse(400, `Campos requeridos faltantes: ${missingFields.join(', ')}`), 400);
         }
 
         const { data, error } = await createAppointment(appointmentData);
 
         if (error) {
-            const statusCode = error.includes('not found') ? 404 : 
-                              error.includes('not available') ? 409 : 
-                              error.includes('Invalid date format') ? 400 : 500;
-            return c.json(errorResponse(statusCode, error), statusCode);
+            // Map error messages to appropriate HTTP status codes
+            let statusCode = 500;
+            if (error.includes('no encontrado') || error.includes('not found')) {
+                statusCode = 404;
+            } else if (error.includes('no está disponible') || error.includes('not available')) {
+                statusCode = 409;
+            } else if (error.includes('Formato de fecha inválido') || error.includes('Invalid date format')) {
+                statusCode = 400;
+            } else if (error.includes('Campos requeridos faltantes') || error.includes('Missing required fields')) {
+                statusCode = 400;
+            } else if (error.includes('Error interno del servidor') || error.includes('Internal server error')) {
+                statusCode = 500;
+            }
+            
+            return c.json(errorResponse(statusCode, error), statusCode as any);
         }
 
         if (!data) {
-            return c.json(errorResponse(500, 'Failed to create appointment'), 500);
+            return c.json(errorResponse(500, 'Error al crear la cita. Por favor, intenta nuevamente.'), 500);
         }
 
         return c.json(successResponse(201, data), 201);
     } catch (error) {
         console.error('Error creating appointment:', error);
-        return c.json(errorResponse(500, 'Internal server error'), 500);
+        return c.json(errorResponse(500, 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'), 500);
     }
 });
 

@@ -104,18 +104,31 @@ schedulesRouter.post('/availability', authMiddleware, async (c: Context) => {
         const { data, error } = await getAvailability(barberId, date);
 
         if (error) {
-            const statusCode = error.includes('Invalid date format') ? 400 : 500;
-            return c.json(errorResponse(statusCode, error), statusCode);
+            // Map error messages to appropriate HTTP status codes
+            let statusCode = 500;
+            if (error.includes('no encontrado') || error.includes('not found')) {
+                statusCode = 404;
+            } else if (error.includes('Formato de fecha inválido') || error.includes('Invalid date format')) {
+                statusCode = 400;
+            } else if (error.includes('Fecha inválida')) {
+                statusCode = 400;
+            } else if (error.includes('fechas pasadas')) {
+                statusCode = 400;
+            } else if (error.includes('Error interno del servidor') || error.includes('Internal server error')) {
+                statusCode = 500;
+            }
+            
+            return c.json(errorResponse(statusCode, error), statusCode as any);
         }
 
         if (!data) {
-            return c.json(errorResponse(404, 'Availability not found'), 404);
+            return c.json(errorResponse(404, 'No se encontró disponibilidad para esta fecha'), 404);
         }
 
         return c.json(successResponse(200, data), 200);
     } catch (error) {
         console.error('Error getting availability:', error);
-        return c.json(errorResponse(500, 'Internal server error'), 500);
+        return c.json(errorResponse(500, 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'), 500);
     }
 });
 

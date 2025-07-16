@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/components/auth/AuthContext';
 import Colors from '@/constants/Colors';
 import ScreenWrapper from '@/components/ui/ScreenWrapper';
+import { formatPhoneAsTyping, isValidPhoneNumber } from '@/helpers/phoneFormatter';
 
 export default function SignUpScreen() {
   const [firstName, setFirstName] = useState('');
@@ -42,10 +43,9 @@ export default function SignUpScreen() {
       return;
     }
 
-    // Validar formato de teléfono básico
-    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{7,15}$/;
-    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
-      Alert.alert('Error', 'Por favor ingresa un número de teléfono válido');
+    // Validate phone number format for Twilio compatibility
+    if (!isValidPhoneNumber(phone)) {
+      Alert.alert('Error', 'Por favor ingresa un número de teléfono válido en formato internacional (ej: +1234567890)');
       return;
     }
 
@@ -127,12 +127,21 @@ export default function SignUpScreen() {
                   <TextInput
                     style={styles.input}
                     value={phone}
-                    onChangeText={setPhone}
-                    placeholder="+1234567890"
+                    onChangeText={(text) => setPhone(formatPhoneAsTyping(text))}
+                    placeholder="+1 (234) 567-8900"
                     placeholderTextColor={Colors.dark.textLight}
                     keyboardType="phone-pad"
                     autoCorrect={false}
                   />
+                  {/* Helper and warning text for phone format */}
+                  <Text style={styles.helperText}>
+                    Incluye el código de país, por ejemplo: +1 234 567 8900
+                  </Text>
+                  {phone.length > 0 && !isValidPhoneNumber(phone) && (
+                    <Text style={styles.warningText}>
+                      Formato inválido. Usa el formato internacional: +1 234 567 8900
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -311,5 +320,17 @@ const styles = StyleSheet.create({
     color: Colors.dark.primary,
     fontSize: 14,
     fontWeight: '500',
+  },
+  helperText: {
+    fontSize: 12,
+    color: Colors.dark.textLight,
+    marginTop: 4,
+    marginLeft: 2,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#ff3b30',
+    marginTop: 2,
+    marginLeft: 2,
   },
 }); 
