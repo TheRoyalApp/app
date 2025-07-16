@@ -1,0 +1,2 @@
+-- Empty migration to satisfy journal
+-- This migration was deleted and recreated to fix schema issues 

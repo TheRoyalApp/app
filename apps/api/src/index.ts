@@ -30,8 +30,11 @@ app.use('*', cors({
     'exp://localhost:19000',
     'exp://192.168.1.*:8081',
     'exp://192.168.1.*:19000',
+    'exp://192.168.1.198:8081',
+    'exp://192.168.1.198:19000',
     'http://localhost:3000',
-    'http://localhost:8081'
+    'http://localhost:8081',
+    'http://192.168.1.198:8081'
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Refresh-Token', 'X-Requested-With'],
