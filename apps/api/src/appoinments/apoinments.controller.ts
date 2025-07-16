@@ -6,6 +6,7 @@ import type { Appointment, Status } from "./appoinments.d.js";
 import { isTimeSlotAvailable } from "../schedules/schedules.controller.js";
 import type { TimeSlot } from "../schedules/schedules.d.js";
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
+import { sendAppointmentConfirmation } from "../notifications/notifications.controller.js";
 
 // Helper function to convert dd/mm/yyyy to Date object
 function parseDate(dateString: string): Date | null {
@@ -214,6 +215,19 @@ export async function updateAppointmentStatus(id: string, status: Status) {
     if (updatedAppointment.length === 0 || !updatedAppointment[0]) {
       res.error = 'Appointment not found';
       return res;
+    }
+
+    // Send WhatsApp confirmation if status is 'confirmed'
+    if (status === 'confirmed') {
+      try {
+        const notificationResult = await sendAppointmentConfirmation(id);
+        if (!notificationResult.success) {
+          console.warn('Failed to send WhatsApp confirmation:', notificationResult.error);
+        }
+      } catch (error) {
+        console.error('Error sending WhatsApp confirmation:', error);
+        // Don't fail the appointment update if notification fails
+      }
     }
 
     res.data = updatedAppointment[0] ? updatedAppointment[0] as any : null;

@@ -20,6 +20,7 @@
     "test:comprehensive": "bun run tests/production-test-suite.js && bun test tests/production-test-suite.test.ts",
     "test:coverage": "bun test --coverage tests/",
     "test:full": "bun run tests/run-production-tests.js",
+    "cron:reminders": "bun run src/scripts/reminder-cron.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -30,6 +31,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.4",
+    "@hono/zod-validator": "^0.7.1",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
@@ -40,6 +42,7 @@
     "nodemon": "^3.1.10",
     "postgres": "^3.4.7",
     "stripe": "^18.2.1",
+    "twilio": "^5.7.3",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "zod": "^3.25.67"

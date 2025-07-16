@@ -15,6 +15,7 @@ import serviceRoutes from './services/services.routes.js';
 import scheduleRoutes from './schedules/schedules.routes.js';
 import appointmentRoutes from './appoinments/appoinments.route.js';
 import { paymentsRoute } from './payments/payments.route.js';
+import notificationsRoute from './notifications/notifications.route.js';
 
 const app = new Hono();
 
@@ -78,6 +79,7 @@ app.route('/services', serviceRoutes);
 app.route('/schedules', scheduleRoutes);
 app.route('/appointments', appointmentRoutes);
 app.route('/payments', paymentsRoute);
+app.route('/notifications', notificationsRoute);
 
 // Global error handler
 app.onError((err, c) => {
