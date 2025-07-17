@@ -218,6 +218,31 @@ export default function HomeScreen() {
 				</View>
 
 				<Container>
+					<Button onPress={() => router.push({
+						pathname: '/payment/success',
+						params: {
+							timeSlot: '14:30',
+							appointmentDate: '15/07/2025',
+							serviceName: 'Corte Clásico',
+							barberName: 'Juan Pérez',
+							amount: '250.00'
+						}
+					})}>
+						Test Pago Exitoso
+					</Button>
+					<Button onPress={() => router.push({
+						pathname: '/payment/failed',
+						params: {
+							timeSlot: '14:30',
+							appointmentDate: '15/07/2025',
+							serviceName: 'Corte Clásico',
+							barberName: 'Juan Pérez',
+							amount: '250.00',
+							errorMessage: 'Pago cancelado por el usuario'
+						}
+					})}>
+						Test Pago Fallido
+					</Button>	
 					<View style={{ marginBottom: 20 }}>
 						<ThemeText
 							style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 5 }}

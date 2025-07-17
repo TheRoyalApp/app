@@ -29,10 +29,22 @@ export default function DebugDeepLinks() {
 		Linking.openURL(testUrl);
 	};
 
+	const testUnencodedDeepLink = () => {
+		const testUrl = 'app://payment/success?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte Clásico&barberName=Juan Pérez&amount=250.00';
+		console.log('🧪 Testing unencoded deep link:', testUrl);
+		Linking.openURL(testUrl);
+	};
+
+	const testSpecialCharactersDeepLink = () => {
+		const testUrl = 'app://payment/success?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte%20Cl%C3%A1sico%20con%20Estilo&barberName=Jos%C3%A9%20Mar%C3%ADa%20Garc%C3%ADa&amount=300.00';
+		console.log('🧪 Testing special characters deep link:', testUrl);
+		Linking.openURL(testUrl);
+	};
+
 	const showDebugInfo = () => {
 		Alert.alert(
 			'Debug Info',
-			'Check the console for detailed logs about deep link handling.\n\nLook for:\n• 🔗 Global URL handler received\n• 👤 Current user state\n• ⏳ Loading state\n• Navigation attempts',
+			'Check the console for detailed logs about deep link handling.\n\nLook for:\n• 🔗 Global URL handler received\n• 👤 Current user state\n• ⏳ Loading state\n• Navigation attempts\n• ✅ Successfully navigated messages\n• 🔄 Final fallback messages',
 			[{ text: 'OK' }]
 		);
 	};
@@ -40,36 +52,44 @@ export default function DebugDeepLinks() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.content}>
-				<Text style={styles.title}>Deep Link Debug</Text>
+				<Text style={styles.title}>🧪 Deep Link Testing</Text>
 				<Text style={styles.subtitle}>
-					Test deep link functionality for payment callbacks
+					Test different deep link scenarios to verify payment callback functionality.
 				</Text>
 
 				<View style={styles.buttonContainer}>
-					<TouchableOpacity style={styles.successButton} onPress={testSuccessDeepLink}>
-						<Text style={styles.buttonText}>Test Success Deep Link</Text>
+					<TouchableOpacity style={styles.button} onPress={testSuccessDeepLink}>
+						<Text style={styles.buttonText}>✅ Test Success Deep Link</Text>
 					</TouchableOpacity>
 
-					<TouchableOpacity style={styles.failedButton} onPress={testFailedDeepLink}>
-						<Text style={styles.buttonText}>Test Failed Deep Link</Text>
+					<TouchableOpacity style={styles.button} onPress={testFailedDeepLink}>
+						<Text style={styles.buttonText}>❌ Test Failed Deep Link</Text>
 					</TouchableOpacity>
 
-					<TouchableOpacity style={styles.legacyButton} onPress={testLegacyDeepLink}>
-						<Text style={styles.buttonText}>Test Legacy Deep Link</Text>
+					<TouchableOpacity style={styles.button} onPress={testLegacyDeepLink}>
+						<Text style={styles.buttonText}>🔄 Test Legacy Deep Link</Text>
 					</TouchableOpacity>
 
-					<TouchableOpacity style={styles.infoButton} onPress={showDebugInfo}>
-						<Text style={styles.buttonText}>Show Debug Info</Text>
+					<TouchableOpacity style={styles.button} onPress={testUnencodedDeepLink}>
+						<Text style={styles.buttonText}>🔤 Test Unencoded Deep Link</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity style={styles.button} onPress={testSpecialCharactersDeepLink}>
+						<Text style={styles.buttonText}>🎭 Test Special Characters</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity style={styles.button} onPress={showDebugInfo}>
+						<Text style={styles.buttonText}>ℹ️ Show Debug Info</Text>
 					</TouchableOpacity>
 				</View>
 
 				<View style={styles.infoContainer}>
-					<Text style={styles.infoTitle}>How to Test:</Text>
+					<Text style={styles.infoTitle}>Instructions:</Text>
 					<Text style={styles.infoText}>
-						1. Press any test button above{'\n'}
-						2. Check if the app navigates to the correct screen{'\n'}
-						3. Check console logs for debugging info{'\n'}
-						4. If navigation fails, check the console for error messages
+						• Press any test button to simulate a deep link{'\n'}
+						• Check the console for detailed logs{'\n'}
+						• Verify that the app navigates to the correct screen{'\n'}
+						• Test with different character encodings
 					</Text>
 				</View>
 			</View>
@@ -105,6 +125,13 @@ const styles = StyleSheet.create({
 	buttonContainer: {
 		width: '100%',
 		marginBottom: 40,
+	},
+	button: {
+		backgroundColor: Colors.dark.primary,
+		padding: 16,
+		borderRadius: 8,
+		marginBottom: 12,
+		alignItems: 'center',
 	},
 	successButton: {
 		backgroundColor: Colors.dark.success,

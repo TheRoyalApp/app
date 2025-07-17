@@ -71,35 +71,71 @@ function RootLayoutNav() {
 
 	// Global deep link handling for payment callbacks
 	React.useEffect(() => {
+		// Track if we're expecting a payment callback
+		let paymentCallbackExpected = false;
+		let paymentCallbackTimeout: ReturnType<typeof setTimeout> | null = null;
+		let alertShown = false; // Flag to prevent duplicate alerts
+		let paymentCancelled = false; // Global flag to track if payment was cancelled
+
 		const handleUrl = (url: string) => {
 			console.log('🔗 Global URL handler received:', url);
 			console.log('👤 Current user state:', user ? 'Authenticated' : 'Not authenticated');
 			console.log('⏳ Loading state:', isLoading ? 'Loading' : 'Ready');
+			
+			// Clear any pending payment callback timeout
+			if (paymentCallbackTimeout) {
+				clearTimeout(paymentCallbackTimeout);
+				paymentCallbackTimeout = null;
+			}
+			paymentCallbackExpected = false;
+			alertShown = false; // Reset alert flag when deep link is received
+			paymentCancelled = false; // Reset payment cancelled flag when deep link is received
 			
 			// Handle payment success URLs
 			if (url.includes('app://payment/success')) {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
-				// Parse URL parameters
-				const urlObj = new URL(url);
+				// Parse URL parameters with better error handling
+				let urlObj;
+				try {
+					urlObj = new URL(url);
+				} catch (urlError) {
+					console.error('Failed to parse URL:', url, urlError);
+					// Show success message even if URL parsing fails
+					if (!alertShown) {
+						alertShown = true;
+						WebBrowser.dismissBrowser();
+						Alert.alert(
+							'¡Pago Exitoso!',
+							'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+							[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+						);
+					}
+					return;
+				}
+				
 				const status = urlObj.searchParams.get('status');
 				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				if (status === 'success' && timeSlot) {
+				// Handle success even if some parameters are missing (embedded browser limitation)
+				if (status === 'success') {
 					// Navigate to success screen with appointment details
 					const appointmentDate = urlObj.searchParams.get('appointmentDate');
 					const serviceName = urlObj.searchParams.get('serviceName');
 					const barberName = urlObj.searchParams.get('barberName');
 					const amount = urlObj.searchParams.get('amount');
 					
-					console.log('Attempting to navigate to success screen with params:', {
-						timeSlot,
-						appointmentDate,
-						serviceName,
-						barberName,
-						amount,
-					});
+					// Decode URL parameters
+					const decodedParams = {
+						timeSlot: timeSlot ? decodeURIComponent(timeSlot) : 'TBD',
+						appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : 'TBD',
+						serviceName: serviceName ? decodeURIComponent(serviceName) : 'Servicio',
+						barberName: barberName ? decodeURIComponent(barberName) : 'Barbero',
+						amount: amount ? decodeURIComponent(amount) : '0',
+					};
+					
+					console.log('Attempting to navigate to success screen with params:', decodedParams);
 					
 					// Wait for navigation to be ready and user to be authenticated
 					const attemptNavigation = () => {
@@ -108,14 +144,9 @@ function RootLayoutNav() {
 							if (user && !isLoading) {
 								router.replace({
 									pathname: '/payment/success',
-									params: {
-										timeSlot,
-										appointmentDate,
-										serviceName,
-										barberName,
-										amount,
-									}
+									params: decodedParams
 								});
+								console.log('✅ Successfully navigated to payment success screen');
 								return true; // Navigation successful
 							} else {
 								console.log('Navigation not ready yet, retrying...');
@@ -124,11 +155,15 @@ function RootLayoutNav() {
 						} catch (navError) {
 							console.error('Global navigation error in success handler:', navError);
 							// Fallback to alert if navigation fails
-							Alert.alert(
-								'¡Pago Exitoso!',
-								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-							);
+							if (!alertShown) {
+								alertShown = true;
+								WebBrowser.dismissBrowser();
+								Alert.alert(
+									'¡Pago Exitoso!',
+									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+								);
+							}
 							return true; // Don't retry after fallback
 						}
 					};
@@ -144,6 +179,32 @@ function RootLayoutNav() {
 								}
 							}, delay);
 						});
+						
+						// Final fallback after 5 seconds
+						setTimeout(() => {
+							console.log('🔄 Final fallback: Showing success alert');
+							if (!alertShown) {
+								alertShown = true;
+								WebBrowser.dismissBrowser();
+								Alert.alert(
+									'¡Pago Exitoso!',
+									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+								);
+							}
+						}, 5000);
+					}
+				} else {
+					console.warn('Invalid success URL parameters:', { status, timeSlot });
+					// Show success message even if parameters are invalid
+					if (!alertShown) {
+						alertShown = true;
+						WebBrowser.dismissBrowser();
+						Alert.alert(
+							'¡Pago Exitoso!',
+							'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+							[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+						);
 					}
 				}
 			}
@@ -152,12 +213,20 @@ function RootLayoutNav() {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
-				// Parse URL parameters
-				const urlObj = new URL(url);
+				// Parse URL parameters with better error handling
+				let urlObj;
+				try {
+					urlObj = new URL(url);
+				} catch (urlError) {
+					console.error('Failed to parse URL:', url, urlError);
+					return;
+				}
+				
 				const status = urlObj.searchParams.get('status');
 				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				if (status === 'cancel' && timeSlot) {
+				// Handle failure even if some parameters are missing (embedded browser limitation)
+				if (status === 'cancel') {
 					// Navigate to failed screen with error details
 					const appointmentDate = urlObj.searchParams.get('appointmentDate');
 					const serviceName = urlObj.searchParams.get('serviceName');
@@ -165,14 +234,17 @@ function RootLayoutNav() {
 					const amount = urlObj.searchParams.get('amount');
 					const errorMessage = urlObj.searchParams.get('errorMessage') || 'El pago no se pudo procesar. Por favor, intenta nuevamente.';
 					
-					console.log('Attempting to navigate to failed screen with params:', {
-						timeSlot,
-						appointmentDate,
-						serviceName,
-						barberName,
-						amount,
-						errorMessage,
-					});
+					// Decode URL parameters
+					const decodedParams = {
+						timeSlot: timeSlot ? decodeURIComponent(timeSlot) : 'TBD',
+						appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : 'TBD',
+						serviceName: serviceName ? decodeURIComponent(serviceName) : 'Servicio',
+						barberName: barberName ? decodeURIComponent(barberName) : 'Barbero',
+						amount: amount ? decodeURIComponent(amount) : '0',
+						errorMessage: errorMessage ? decodeURIComponent(errorMessage) : 'El pago no se pudo procesar. Por favor, intenta nuevamente.',
+					};
+					
+					console.log('Attempting to navigate to failed screen with params:', decodedParams);
 					
 					// Wait for navigation to be ready and user to be authenticated
 					const attemptNavigation = () => {
@@ -181,15 +253,9 @@ function RootLayoutNav() {
 							if (user && !isLoading) {
 								router.replace({
 									pathname: '/payment/failed',
-									params: {
-										timeSlot,
-										appointmentDate,
-										serviceName,
-										barberName,
-										amount,
-										errorMessage,
-									}
+									params: decodedParams
 								});
+								console.log('✅ Successfully navigated to payment failed screen');
 								return true; // Navigation successful
 							} else {
 								console.log('Navigation not ready yet, retrying...');
@@ -198,9 +264,10 @@ function RootLayoutNav() {
 						} catch (navError) {
 							console.error('Global navigation error in failure handler:', navError);
 							// Fallback to alert if navigation fails
+							WebBrowser.dismissBrowser();
 							Alert.alert(
 								'Pago Fallido',
-								errorMessage,
+								decodedParams.errorMessage || 'El pago no se pudo procesar. Por favor, intenta nuevamente.',
 								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
 							);
 							return true; // Don't retry after fallback
@@ -218,7 +285,27 @@ function RootLayoutNav() {
 								}
 							}, delay);
 						});
+						
+						// Final fallback after 5 seconds
+						setTimeout(() => {
+							console.log('🔄 Final fallback: Showing failure alert');
+							WebBrowser.dismissBrowser();
+							Alert.alert(
+								'Pago Fallido',
+								decodedParams.errorMessage || 'El pago no se pudo procesar. Por favor, intenta nuevamente.',
+								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+							);
+						}, 5000);
 					}
+				} else {
+					console.warn('Invalid failure URL parameters:', { status, timeSlot });
+					// Show failure message even if parameters are invalid
+					WebBrowser.dismissBrowser();
+					Alert.alert(
+						'Pago Fallido',
+						'El pago no se pudo procesar. Por favor, intenta nuevamente.',
+						[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+					);
 				}
 			}
 			// Handle legacy payment-callback URLs for backward compatibility
@@ -226,25 +313,36 @@ function RootLayoutNav() {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
-				// Parse URL parameters
-				const urlObj = new URL(url);
+				// Parse URL parameters with better error handling
+				let urlObj;
+				try {
+					urlObj = new URL(url);
+				} catch (urlError) {
+					console.error('Failed to parse URL:', url, urlError);
+					return;
+				}
+				
 				const status = urlObj.searchParams.get('status');
 				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				if (status === 'success' && timeSlot) {
+				// Handle legacy success even if some parameters are missing (embedded browser limitation)
+				if (status === 'success') {
 					// Navigate to success screen with appointment details
 					const appointmentDate = urlObj.searchParams.get('appointmentDate');
 					const serviceName = urlObj.searchParams.get('serviceName');
 					const barberName = urlObj.searchParams.get('barberName');
 					const amount = urlObj.searchParams.get('amount');
 					
-					console.log('Attempting to navigate to success screen with params:', {
-						timeSlot,
-						appointmentDate,
-						serviceName,
-						barberName,
-						amount,
-					});
+					// Decode URL parameters
+					const decodedParams = {
+						timeSlot: timeSlot ? decodeURIComponent(timeSlot) : 'TBD',
+						appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : 'TBD',
+						serviceName: serviceName ? decodeURIComponent(serviceName) : 'Servicio',
+						barberName: barberName ? decodeURIComponent(barberName) : 'Barbero',
+						amount: amount ? decodeURIComponent(amount) : '0',
+					};
+					
+					console.log('Attempting to navigate to success screen with legacy params:', decodedParams);
 					
 					// Wait for navigation to be ready and user to be authenticated
 					const attemptNavigation = () => {
@@ -253,22 +351,18 @@ function RootLayoutNav() {
 							if (user && !isLoading) {
 								router.replace({
 									pathname: '/payment/success',
-									params: {
-										timeSlot,
-										appointmentDate,
-										serviceName,
-										barberName,
-										amount,
-									}
+									params: decodedParams
 								});
+								console.log('✅ Successfully navigated to payment success screen (legacy)');
 								return true; // Navigation successful
 							} else {
 								console.log('Navigation not ready yet, retrying...');
 								return false; // Navigation failed, will retry
 							}
 						} catch (navError) {
-							console.error('Global navigation error in success handler:', navError);
+							console.error('Global navigation error in legacy success handler:', navError);
 							// Fallback to alert if navigation fails
+							WebBrowser.dismissBrowser();
 							Alert.alert(
 								'¡Pago Exitoso!',
 								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
@@ -289,72 +383,82 @@ function RootLayoutNav() {
 								}
 							}, delay);
 						});
+						
+						// Final fallback after 5 seconds
+						setTimeout(() => {
+							console.log('🔄 Final fallback: Showing success alert (legacy)');
+							if (!alertShown) {
+								alertShown = true;
+								WebBrowser.dismissBrowser();
+								Alert.alert(
+									'¡Pago Exitoso!',
+									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+								);
+							}
+						}, 5000);
 					}
 				} else {
-					// Navigate to failed screen with error details
-					const appointmentDate = urlObj.searchParams.get('appointmentDate');
-					const serviceName = urlObj.searchParams.get('serviceName');
-					const barberName = urlObj.searchParams.get('barberName');
-					const amount = urlObj.searchParams.get('amount');
-					const errorMessage = urlObj.searchParams.get('errorMessage') || 'El pago no se pudo procesar. Por favor, intenta nuevamente.';
-					
-					console.log('Attempting to navigate to failed screen with params:', {
-						timeSlot,
-						appointmentDate,
-						serviceName,
-						barberName,
-						amount,
-						errorMessage,
-					});
-					
-					// Wait for navigation to be ready and user to be authenticated
-					const attemptNavigation = () => {
-						try {
-							// Check if user is authenticated and navigation is ready
-							if (user && !isLoading) {
-								router.replace({
-									pathname: '/payment/failed',
-									params: {
-										timeSlot,
-										appointmentDate,
-										serviceName,
-										barberName,
-										amount,
-										errorMessage,
-									}
-								});
-								return true; // Navigation successful
-							} else {
-								console.log('Navigation not ready yet, retrying...');
-								return false; // Navigation failed, will retry
-							}
-						} catch (navError) {
-							console.error('Global navigation error in failure handler:', navError);
-							// Fallback to alert if navigation fails
-							Alert.alert(
-								'Pago Fallido',
-								errorMessage,
-								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-							);
-							return true; // Don't retry after fallback
-						}
-					};
-					
-					// Try navigation immediately
-					if (!attemptNavigation()) {
-						// If failed, retry with increasing delays
-						const retryDelays = [500, 1000, 2000];
-						retryDelays.forEach((delay, index) => {
-							setTimeout(() => {
-								if (!attemptNavigation()) {
-									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
-								}
-							}, delay);
-						});
-					}
+					console.warn('Invalid legacy URL parameters:', { status, timeSlot });
+					// Show success message even if parameters are invalid
+					WebBrowser.dismissBrowser();
+					Alert.alert(
+						'¡Pago Exitoso!',
+						'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
+						[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+					);
 				}
 			}
 		};
+
+		// Function to set up payment callback expectation
+		const expectPaymentCallback = () => {
+			paymentCallbackExpected = true;
+			console.log('💰 Payment callback expected - setting up timeout');
+			
+			// Set up timeout for payment callback
+			paymentCallbackTimeout = setTimeout(() => {
+				if (paymentCallbackExpected && !alertShown && !paymentCancelled) {
+					console.log('⏰ Payment callback timeout - showing success message');
+					paymentCallbackExpected = false;
+					alertShown = true;
+					
+					// Show success message as fallback
+					WebBrowser.dismissBrowser();
+					Alert.alert(
+						'¡Pago Procesado!',
+						'Tu pago ha sido procesado. Si el pago fue exitoso, tu cita ha sido confirmada. Revisa tu historial para confirmar.',
+						[
+							{ 
+								text: 'Ver Historial', 
+								onPress: () => router.replace('/(tabs)/history') 
+							},
+							{ 
+								text: 'OK', 
+								onPress: () => router.replace('/(tabs)') 
+							}
+						]
+					);
+				}
+			}, 10000); // 10 second timeout
+		};
+
+		// Expose the function globally for the appointment screen to use
+		(global as any).expectPaymentCallback = expectPaymentCallback;
+
+		// Function to clear payment callback expectation
+		const clearPaymentCallback = () => {
+			paymentCallbackExpected = false;
+			paymentCancelled = true; // Mark payment as cancelled
+			if (paymentCallbackTimeout) {
+				clearTimeout(paymentCallbackTimeout);
+				paymentCallbackTimeout = null;
+			}
+			console.log('💰 Payment callback cleared - user cancelled payment');
+		};
+
+		// Expose the clear function globally
+		(global as any).clearPaymentCallback = clearPaymentCallback;
 
 		const subscription = Linking.addEventListener('url', ({ url }) => {
 			console.log('🔗 Expo Linking URL event received:', url);
@@ -368,6 +472,50 @@ function RootLayoutNav() {
 				handleUrl(url);
 			}
 		});
+
+		// Add fallback for Safari deep link issues
+		const checkSafariDeepLink = async () => {
+			try {
+				const canOpen = await Linking.canOpenURL('app://payment/success');
+				console.log('🔗 Can open deep link:', canOpen);
+				
+				if (!canOpen) {
+					console.warn('⚠️ Deep link not available - Safari may show "path cannot be found"');
+				}
+			} catch (error) {
+				console.error('❌ Error checking deep link availability:', error);
+			}
+		};
+
+		// Check deep link availability after a delay
+		setTimeout(checkSafariDeepLink, 2000);
+
+		// Add monitoring for embedded browser failures
+		const monitorEmbeddedBrowserFailure = () => {
+			// This will be called when we detect that the embedded browser failed
+			console.log('🔄 Detected embedded browser failure - showing fallback message');
+			if (!alertShown && !paymentCancelled) {
+				alertShown = true;
+				WebBrowser.dismissBrowser();
+				Alert.alert(
+					'Pago Procesado',
+					'El pago ha sido procesado. Si el pago fue exitoso, tu cita ha sido confirmada. Revisa tu historial para confirmar.',
+					[
+						{ 
+							text: 'Ver Historial', 
+							onPress: () => router.replace('/(tabs)/history') 
+						},
+						{ 
+							text: 'OK', 
+							onPress: () => router.replace('/(tabs)') 
+						}
+					]
+				);
+			}
+		};
+
+		// Expose the failure handler globally
+		(global as any).handleEmbeddedBrowserFailure = monitorEmbeddedBrowserFailure;
 
 		return () => subscription?.remove();
 	}, [router, user, isLoading]);

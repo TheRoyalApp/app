@@ -74,11 +74,6 @@ export default function PaymentSuccessScreen() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.content}>
-				{/* Success Icon */}
-				<View style={styles.iconContainer}>
-					<Ionicons name="checkmark-circle" size={120} color={Colors.dark.success} />
-				</View>
-
 				{/* Success Message */}
 				<Text style={styles.title}>¡Pago Exitoso!</Text>
 				<Text style={styles.subtitle}>
