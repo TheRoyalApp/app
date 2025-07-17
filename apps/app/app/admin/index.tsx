@@ -85,11 +85,20 @@ const AdminPanel = () => {
   useEffect(() => {
     if (!isLoading && user) {
       console.log('AdminPanel: user is set, fetching data:', user);
+      console.log('AdminPanel: activeTab:', activeTab);
       fetchAllData();
     } else {
       console.log('AdminPanel: waiting for user or still loading. isLoading:', isLoading, 'user:', user);
     }
   }, [user, isLoading, activeTab]);
+
+  // Force refresh when tab changes
+  useEffect(() => {
+    if (user && !isLoading) {
+      console.log('AdminPanel: Tab changed to:', activeTab);
+      fetchAllData();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (showCreateModal) {
@@ -234,75 +243,80 @@ const AdminPanel = () => {
       console.log('fetchAllData: No user, aborting fetch.');
       return;
     }
+    console.log('fetchAllData: Starting data fetch for tab:', activeTab);
     setRefreshing(true);
+    
     // Appointments
     if (activeTab === 'appointments') {
-      if (user.isAdmin) {
-        // Admin sees all appointments with progressive loading
-        setIsLoadingAppointments(true);
-        setAppointmentsLoaded(0);
-        setTotalAppointments(0);
-        
-        try {
+      console.log('fetchAllData: Loading appointments for user:', user.isAdmin ? 'admin' : user.role);
+      try {
+        if (user.isAdmin) {
+          // Admin sees all appointments
+          setIsLoadingAppointments(true);
+          setAppointmentsLoaded(0);
+          setTotalAppointments(0);
+          
           const res = await AppointmentsService.getAllAppointments();
           console.log('Fetched all appointments for admin:', res);
+          console.log('Appointments response success:', res.success);
+          console.log('Appointments data length:', res.data?.length || 0);
+          
           if (res && res.success && res.data) {
             const allAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
+            console.log('Filtered appointments (excluding completed):', allAppointments.length);
+            setAppointments(allAppointments);
             setTotalAppointments(allAppointments.length);
-            
-            // Load appointments progressively in batches of 10
-            const batchSize = 10;
-            const appointmentsToShow = [];
-            
-            for (let i = 0; i < allAppointments.length; i += batchSize) {
-              const batch = allAppointments.slice(i, i + batchSize);
-              appointmentsToShow.push(...batch);
-              setAppointments(appointmentsToShow);
-              setAppointmentsLoaded(appointmentsToShow.length);
-              
-              // Add a small delay to show progressive loading
-              if (i + batchSize < allAppointments.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
+            setAppointmentsLoaded(allAppointments.length);
           } else {
+            console.log('No appointments data or API failed');
             setAppointments([]);
             setTotalAppointments(0);
           }
-        } catch (error) {
-          console.error('Error loading appointments for admin:', error);
-          setAppointments([]);
-        } finally {
-          setIsLoadingAppointments(false);
+        } else if (user.role === 'staff') {
+          // Staff sees only their own appointments
+          const res = await AppointmentsService.getBarberAppointments(user.id);
+          console.log('Fetched barber appointments for staff:', res);
+          if (res && res.success && res.data) {
+            const filteredAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
+            console.log('Staff appointments (excluding completed):', filteredAppointments.length);
+            setAppointments(filteredAppointments);
+          } else {
+            console.log('No staff appointments data');
+            setAppointments([]);
+          }
+        } else {
+          // Regular users see only their own appointments
+          const res = await AppointmentsService.getUserAppointments();
+          console.log('Fetched user appointments:', res);
+          if (res && res.success && res.data) {
+            const filteredAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
+            console.log('User appointments (excluding completed):', filteredAppointments.length);
+            setAppointments(filteredAppointments);
+          } else {
+            console.log('No user appointments data');
+            setAppointments([]);
+          }
         }
-      } else if (user.role === 'staff') {
-        // Staff sees only their own appointments
-        const res = await AppointmentsService.getBarberAppointments(user.id);
-        console.log('Fetched barber appointments for staff:', res);
-        if (res && res.success && res.data) {
-          // Filter to show only non-closed appointments (pending, confirmed, cancelled)
-          // Exclude completed appointments as they are considered "closed"
-          setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
-        } else setAppointments([]);
-      } else {
-        // Regular users see only their own appointments
-        const res = await AppointmentsService.getUserAppointments();
-        console.log('Fetched user appointments:', res);
-        if (res && res.success && res.data) {
-          // Filter to show only non-closed appointments (pending, confirmed, cancelled)
-          // Exclude completed appointments as they are considered "closed"
-          setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
-        } else setAppointments([]);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        setAppointments([]);
+      } finally {
+        setIsLoadingAppointments(false);
+        console.log('Appointments loading completed');
       }
     }
+    
     // Services
     if (activeTab === 'services') {
+      console.log('fetchAllData: Loading services');
       const res = await ServicesService.getAllServices();
       if (res.success && res.data) setServices(res.data);
       else setServices([]);
     }
+    
     // Schedules
     if (activeTab === 'availability') {
+      console.log('fetchAllData: Loading schedules');
       if (user.isAdmin) {
         const res = await SchedulesService.getAllSchedules();
         if (res.success && res.data) setSchedules(res.data);
@@ -313,16 +327,14 @@ const AdminPanel = () => {
         else setSchedules([]);
       }
     }
+    
     setRefreshing(false);
+    console.log('fetchAllData: Completed for tab:', activeTab);
   };
 
   const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    // Simulate data refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    fetchAllData();
+  }, [user, activeTab]);
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -401,7 +413,7 @@ const AdminPanel = () => {
     // Convert API service to UI format for editor
     setEditingService({
       ...service,
-      description: service.description ? [service.description] : [],
+      description: service.description || '',
     } as any);
     setShowServiceEditor(true);
   };
@@ -1163,17 +1175,9 @@ const AdminPanel = () => {
   );
 
   if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <Container>
-          <ThemeText style={styles.errorText}>Acceso no autorizado</ThemeText>
-          <Button onPress={() => router.push('/auth/login')}>
-            Iniciar Sesión
-          </Button>
-        </Container>
-      </SafeAreaView>
-    );
+    // Redirect to welcome screen if there's no session
+    router.replace('/auth/welcome');
+    return null;
   }
 
   return (
@@ -1286,7 +1290,7 @@ const AdminPanel = () => {
           setEditingService(null);
         }}
         onSave={handleSaveService}
-        initialService={editingService ? { ...editingService, price: Number(editingService.price), description: editingService.description ? [editingService.description] : [] } : undefined}
+        initialService={editingService ? { ...editingService, price: Number(editingService.price), description: editingService.description || '' } : undefined}
         category={'barber'}
       />
 

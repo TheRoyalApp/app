@@ -85,15 +85,15 @@ export default function AppointmentScreen() {
 			
 			console.log('🚀 Starting initial data load...');
 			
-			// Load services and barbers in parallel, but don't fail if one fails
-			const results = await Promise.allSettled([
+			// Load services and barbers in parallel with proper error handling
+			const [servicesResult, barbersResult] = await Promise.allSettled([
 				loadServices(),
 				loadBarbers()
 			]);
 			
 			console.log('📊 Initial data load results:', {
-				services: results[0].status,
-				barbers: results[1].status
+				services: servicesResult.status,
+				barbers: barbersResult.status
 			});
 			
 			// Check if we have at least some data
@@ -120,13 +120,8 @@ export default function AppointmentScreen() {
 			setServices([]); // Clear existing services
 			setServicesError(null); // Clear any previous errors
 			
-			// Test network connectivity first
-			const isConnected = await testNetworkConnectivity();
-			if (!isConnected) {
-				console.log('❌ Network connectivity test failed for services retry');
-				setServicesError('No se puede conectar al servidor. Verifica tu conexión a internet.');
-				return;
-			}
+			// Clear services cache to force fresh load
+			ServicesService.clearCache();
 			
 			await loadServices();
 		} catch (error) {
@@ -137,16 +132,9 @@ export default function AppointmentScreen() {
 
 	const retryLoadBarbers = async () => {
 		try {
-			console.log('🔄 Retrying barber load...');
+			console.log('🔄 Retrying barbers load...');
 			setBarbers([]); // Clear existing barbers
 			setBarberError(null); // Clear any previous errors
-			
-			// Test network connectivity first
-			const isConnected = await testNetworkConnectivity();
-			if (!isConnected) {
-				setBarberError('No se puede conectar al servidor. Verifica tu conexión a internet.');
-				return;
-			}
 			
 			await loadBarbers();
 		} catch (error) {
@@ -157,17 +145,25 @@ export default function AppointmentScreen() {
 
 	const retryLoadAll = async () => {
 		try {
-			setHasAttemptedLoad(false); // Reset the flag to allow retry
+			console.log('🔄 Retrying all data load...');
+			setIsLoading(true);
 			setServices([]);
 			setBarbers([]);
-			setSelectedService(null);
-			setSelectedBarber(null);
-			setServicesError(null); // Clear services error
-			setBarberError(null); // Clear barber error
-			setIsLoading(true);
-			await loadInitialData();
+			setServicesError(null);
+			setBarberError(null);
+			
+			// Clear services cache to force fresh load
+			ServicesService.clearCache();
+			
+			// Load both in parallel
+			await Promise.allSettled([
+				loadServices(),
+				loadBarbers()
+			]);
 		} catch (error) {
-			console.error('Error retrying all data load:', error);
+			console.error('❌ Error retrying all data load:', error);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -179,60 +175,17 @@ export default function AppointmentScreen() {
 			
 			console.log('🔄 Loading services from:', `${API_CONFIG.baseURL}/services`);
 			
-			// Test network connectivity first
-			const isConnected = await testNetworkConnectivity();
-			if (!isConnected) {
-				console.log('❌ Network connectivity test failed for services');
-				setServicesError('No se puede conectar al servidor. Verifica tu conexión a internet.');
-				return; // Don't throw error, just return and let UI handle it
-			}
+			// Use the optimized service with caching
+			const response = await ServicesService.getAllServices();
 			
-			// Use a longer timeout for services request
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased to 8 seconds
+			console.log('📡 Services API Response:', response);
 			
-			try {
-				const response = await fetch(`${API_CONFIG.baseURL}/services`, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-						'Accept': 'application/json',
-					},
-					signal: controller.signal,
-				});
-				
-				clearTimeout(timeoutId);
-				
-				console.log('📡 Services API Response Status:', response.status);
-				
-				if (!response.ok) {
-					let errorMessage = `HTTP ${response.status}`;
-					try {
-						const errorData = await response.json();
-						errorMessage = errorData.message || errorData.error || errorMessage;
-						console.log('❌ Services API Error Response:', errorData);
-					} catch (parseError) {
-						// If we can't parse the error response, use the status text
-						errorMessage = response.statusText || errorMessage;
-						console.log('❌ Services API Parse Error:', parseError);
-					}
-					throw new Error(errorMessage);
-				}
-				
-				const data = await response.json();
-				console.log('✅ Services API Success Response:', data);
-				
-				if (data.success && data.data) {
-					console.log('🎯 Services loaded:', data.data.length);
-					setServices(data.data);
-				} else {
-					console.error('Failed to load services:', data.error);
-					setServicesError('No se pudieron cargar los servicios. Por favor, intenta nuevamente.');
-				}
-			} catch (fetchError) {
-				clearTimeout(timeoutId);
-				console.log('❌ Fetch error in loadServices:', fetchError);
-				throw fetchError;
+			if (response.success && response.data) {
+				console.log('🎯 Services loaded:', response.data.length);
+				setServices(response.data);
+			} else {
+				console.error('Failed to load services:', response.error);
+				setServicesError('No se pudieron cargar los servicios. Por favor, intenta nuevamente.');
 			}
 		} catch (error) {
 			console.error('Error loading services:', error);
@@ -280,6 +233,7 @@ export default function AppointmentScreen() {
 				headers: {
 					'Content-Type': 'application/json',
 				},
+				signal: AbortSignal.timeout(3000), // Reduced timeout
 			});
 			console.log('✅ Network connectivity test successful:', response.status);
 			return true;
@@ -295,115 +249,70 @@ export default function AppointmentScreen() {
 			setBarberError(null);
 			console.log('🔄 Loading barbers from:', `${API_CONFIG.baseURL}/users/staff`);
 			
-			// Test network connectivity first
-			const isConnected = await testNetworkConnectivity();
-			if (!isConnected) {
-				setBarberError('No se puede conectar al servidor. Verifica tu conexión a internet.');
-				setBarbers([]);
-				setSelectedBarber(null);
-				return;
-			}
+			// Use the optimized API client with caching
+			const response = await apiClient.get<any[]>('/users/staff', true, true); // Use caching
 			
-			// Use a faster request without retry logic for better UX
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
+			console.log('📡 Barber API Response:', response);
 			
-			try {
-				const response = await fetch(`${API_CONFIG.baseURL}/users/staff`, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-						'Accept': 'application/json',
-					},
-					signal: controller.signal,
-				});
+			if (response.success && response.data && Array.isArray(response.data)) {
+				console.log('👥 Staff users found:', response.data.length);
+				console.log('👥 Staff users data:', response.data);
 				
-				clearTimeout(timeoutId);
-				
-				console.log('📡 Barber API Response Status:', response.status);
-				console.log('📡 Barber API Response Headers:', Object.fromEntries(response.headers.entries()));
-				
-				if (!response.ok) {
-					let errorMessage = `HTTP ${response.status}`;
-					try {
-						const errorData = await response.json();
-						errorMessage = errorData.message || errorData.error || errorMessage;
-						console.log('❌ Barber API Error Response:', errorData);
-					} catch (parseError) {
-						// If we can't parse the error response, use the status text
-						errorMessage = response.statusText || errorMessage;
-						console.log('❌ Barber API Parse Error:', parseError);
-					}
-					throw new Error(errorMessage);
-				}
-				
-				const data = await response.json();
-				console.log('✅ Barber API Success Response:', data);
-				
-				if (data.success && data.data && Array.isArray(data.data)) {
-					console.log('👥 Staff users found:', data.data.length);
-					console.log('👥 Staff users data:', data.data);
-					
-					if (data.data.length === 0) {
-						console.log('⚠️ No barbers found in response');
-						setBarberError('No hay barberos disponibles en el sistema');
-						setBarbers([]);
-						setSelectedBarber(null);
-						return;
-					}
-					
-					const mappedBarbers = data.data.map((user: any) => ({
-						id: user.id,
-						name: `${user.firstName} ${user.lastName}`,
-						email: user.email,
-						firstName: user.firstName,
-						lastName: user.lastName
-					}));
-					
-					console.log('🎯 Mapped barbers:', mappedBarbers);
-					setBarbers(mappedBarbers);
-					
-					// Auto-select Carlos Rodriguez if available
-					const carlos = data.data.find((user: any) => user.email === 'barber@theroyalbarber.com');
-					if (carlos) {
-						const selectedCarlos = {
-							id: carlos.id,
-							name: `${carlos.firstName} ${carlos.lastName}`,
-							email: carlos.email,
-							firstName: carlos.firstName,
-							lastName: carlos.lastName
-						};
-						console.log('🎯 Auto-selecting Carlos:', selectedCarlos);
-						setSelectedBarber(selectedCarlos);
-					} else if (data.data.length > 0) {
-						// If Carlos not found, select the first available barber
-						const firstBarber = data.data[0];
-						const selectedFirstBarber = {
-							id: firstBarber.id,
-							name: `${firstBarber.firstName} ${firstBarber.lastName}`,
-							email: firstBarber.email,
-							firstName: firstBarber.firstName,
-							lastName: firstBarber.lastName
-						};
-						console.log('🎯 Auto-selecting first barber:', selectedFirstBarber);
-						setSelectedBarber(selectedFirstBarber);
-					}
-				} else {
-					console.log('❌ API response failed or no data');
-					console.log('❌ Response structure:', {
-						success: data.success,
-						hasData: !!data.data,
-						isArray: Array.isArray(data.data),
-						dataType: typeof data.data
-					});
-					setBarberError('No se pudieron cargar los barberos. Por favor, intenta nuevamente.');
+				if (response.data.length === 0) {
+					console.log('⚠️ No barbers found in response');
+					setBarberError('No hay barberos disponibles en el sistema');
 					setBarbers([]);
 					setSelectedBarber(null);
+					return;
 				}
-			} catch (fetchError) {
-				clearTimeout(timeoutId);
-				console.log('❌ Fetch error in loadBarbers:', fetchError);
-				throw fetchError;
+				
+				const mappedBarbers = response.data.map((user: any) => ({
+					id: user.id,
+					name: `${user.firstName} ${user.lastName}`,
+					email: user.email,
+					firstName: user.firstName,
+					lastName: user.lastName
+				}));
+				
+				console.log('🎯 Mapped barbers:', mappedBarbers);
+				setBarbers(mappedBarbers);
+				
+				// Auto-select Carlos Rodriguez if available
+				const carlos = response.data.find((user: any) => user.email === 'barber@theroyalbarber.com');
+				if (carlos) {
+					const selectedCarlos = {
+						id: carlos.id,
+						name: `${carlos.firstName} ${carlos.lastName}`,
+						email: carlos.email,
+						firstName: carlos.firstName,
+						lastName: carlos.lastName
+					};
+					console.log('🎯 Auto-selecting Carlos:', selectedCarlos);
+					setSelectedBarber(selectedCarlos);
+				} else if (response.data.length > 0) {
+					// If Carlos not found, select the first available barber
+					const firstBarber = response.data[0];
+					const selectedFirstBarber = {
+						id: firstBarber.id,
+						name: `${firstBarber.firstName} ${firstBarber.lastName}`,
+						email: firstBarber.email,
+						firstName: firstBarber.firstName,
+						lastName: firstBarber.lastName
+					};
+					console.log('🎯 Auto-selecting first barber:', selectedFirstBarber);
+					setSelectedBarber(selectedFirstBarber);
+				}
+			} else {
+				console.log('❌ API response failed or no data');
+				console.log('❌ Response structure:', {
+					success: response.success,
+					hasData: !!response.data,
+					isArray: Array.isArray(response.data),
+					dataType: typeof response.data
+				});
+				setBarberError('No se pudieron cargar los barberos. Por favor, intenta nuevamente.');
+				setBarbers([]);
+				setSelectedBarber(null);
 			}
 		} catch (error) {
 			console.error('❌ Error loading barbers:', error);

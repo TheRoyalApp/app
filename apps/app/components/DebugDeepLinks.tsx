@@ -1,186 +1,186 @@
-import React from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	Alert,
-} from 'react-native';
-import * as Linking from 'expo-linking';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Colors from '@/constants/Colors';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { performanceMonitor } from '@/helpers/performance';
+import { apiClient } from '@/services/api';
+
+interface PerformanceMetrics {
+  [key: string]: {
+    count: number;
+    average: string;
+    min: string;
+    max: string;
+    total: string;
+  };
+}
 
 export default function DebugDeepLinks() {
-	const testSuccessDeepLink = () => {
-		const testUrl = 'app://payment/success?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte%20Cl%C3%A1sico&barberName=Juan%20P%C3%A9rez&amount=250.00';
-		console.log('🧪 Testing success deep link:', testUrl);
-		Linking.openURL(testUrl);
-	};
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({});
+  const [slowOperations, setSlowOperations] = useState<Array<{id: string, duration: number}>>([]);
 
-	const testFailedDeepLink = () => {
-		const testUrl = 'app://payment/failed?status=cancel&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte%20Cl%C3%A1sico&barberName=Juan%20P%C3%A9rez&amount=250.00&errorMessage=Test%20error%20message';
-		console.log('🧪 Testing failed deep link:', testUrl);
-		Linking.openURL(testUrl);
-	};
+  useEffect(() => {
+    const updateMetrics = () => {
+      setPerformanceMetrics(performanceMonitor.getSummary());
+      setSlowOperations(performanceMonitor.getSlowOperations(1000)); // Show operations slower than 1 second
+    };
 
-	const testLegacyDeepLink = () => {
-		const testUrl = 'app://payment-callback?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte%20Cl%C3%A1sico&barberName=Juan%20P%C3%A9rez&amount=250.00';
-		console.log('🧪 Testing legacy deep link:', testUrl);
-		Linking.openURL(testUrl);
-	};
+    // Update metrics every 5 seconds
+    const interval = setInterval(updateMetrics, 5000);
+    updateMetrics(); // Initial update
 
-	const testUnencodedDeepLink = () => {
-		const testUrl = 'app://payment/success?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte Clásico&barberName=Juan Pérez&amount=250.00';
-		console.log('🧪 Testing unencoded deep link:', testUrl);
-		Linking.openURL(testUrl);
-	};
+    return () => clearInterval(interval);
+  }, []);
 
-	const testSpecialCharactersDeepLink = () => {
-		const testUrl = 'app://payment/success?status=success&timeSlot=14:30&appointmentDate=15/07/2025&serviceName=Corte%20Cl%C3%A1sico%20con%20Estilo&barberName=Jos%C3%A9%20Mar%C3%ADa%20Garc%C3%ADa&amount=300.00';
-		console.log('🧪 Testing special characters deep link:', testUrl);
-		Linking.openURL(testUrl);
-	};
+  const clearMetrics = () => {
+    // Clear old metrics
+    performanceMonitor.clearOldMetrics();
+    setPerformanceMetrics({});
+    setSlowOperations([]);
+  };
 
-	const showDebugInfo = () => {
-		Alert.alert(
-			'Debug Info',
-			'Check the console for detailed logs about deep link handling.\n\nLook for:\n• 🔗 Global URL handler received\n• 👤 Current user state\n• ⏳ Loading state\n• Navigation attempts\n• ✅ Successfully navigated messages\n• 🔄 Final fallback messages',
-			[{ text: 'OK' }]
-		);
-	};
+  const getApiPerformance = () => {
+    return apiClient.getPerformanceSummary();
+  };
 
-	return (
-		<SafeAreaView style={styles.container}>
-			<View style={styles.content}>
-				<Text style={styles.title}>🧪 Deep Link Testing</Text>
-				<Text style={styles.subtitle}>
-					Test different deep link scenarios to verify payment callback functionality.
-				</Text>
+  if (!__DEV__) {
+    return null;
+  }
 
-				<View style={styles.buttonContainer}>
-					<TouchableOpacity style={styles.button} onPress={testSuccessDeepLink}>
-						<Text style={styles.buttonText}>✅ Test Success Deep Link</Text>
-					</TouchableOpacity>
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>🔧 Debug Panel</Text>
+      
+      <ScrollView style={styles.scrollView}>
+        {/* Performance Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📊 Performance Metrics</Text>
+          {Object.keys(performanceMetrics).length > 0 ? (
+            Object.entries(performanceMetrics).map(([operation, metrics]) => (
+              <View key={operation} style={styles.metricItem}>
+                <Text style={styles.operationName}>{operation}</Text>
+                <Text style={styles.metricText}>Count: {metrics.count}</Text>
+                <Text style={styles.metricText}>Avg: {metrics.average}ms</Text>
+                <Text style={styles.metricText}>Min: {metrics.min}ms</Text>
+                <Text style={styles.metricText}>Max: {metrics.max}ms</Text>
+                <Text style={styles.metricText}>Total: {metrics.total}ms</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noData}>No performance data available</Text>
+          )}
+        </View>
 
-					<TouchableOpacity style={styles.button} onPress={testFailedDeepLink}>
-						<Text style={styles.buttonText}>❌ Test Failed Deep Link</Text>
-					</TouchableOpacity>
+                 {/* Slow Operations */}
+         <View style={styles.section}>
+           <Text style={styles.sectionTitle}>🐌 Slow Operations (&gt;1s)</Text>
+          {slowOperations.length > 0 ? (
+            slowOperations.map((op) => (
+              <View key={op.id} style={styles.slowItem}>
+                <Text style={styles.slowId}>{op.id}</Text>
+                <Text style={styles.slowDuration}>{op.duration.toFixed(2)}ms</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noData}>No slow operations detected</Text>
+          )}
+        </View>
 
-					<TouchableOpacity style={styles.button} onPress={testLegacyDeepLink}>
-						<Text style={styles.buttonText}>🔄 Test Legacy Deep Link</Text>
-					</TouchableOpacity>
+        {/* API Performance */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🌐 API Performance</Text>
+          <TouchableOpacity style={styles.button} onPress={() => {
+            const apiMetrics = getApiPerformance();
+            console.log('API Performance Metrics:', apiMetrics);
+          }}>
+            <Text style={styles.buttonText}>Log API Metrics to Console</Text>
+          </TouchableOpacity>
+        </View>
 
-					<TouchableOpacity style={styles.button} onPress={testUnencodedDeepLink}>
-						<Text style={styles.buttonText}>🔤 Test Unencoded Deep Link</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity style={styles.button} onPress={testSpecialCharactersDeepLink}>
-						<Text style={styles.buttonText}>🎭 Test Special Characters</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity style={styles.button} onPress={showDebugInfo}>
-						<Text style={styles.buttonText}>ℹ️ Show Debug Info</Text>
-					</TouchableOpacity>
-				</View>
-
-				<View style={styles.infoContainer}>
-					<Text style={styles.infoTitle}>Instructions:</Text>
-					<Text style={styles.infoText}>
-						• Press any test button to simulate a deep link{'\n'}
-						• Check the console for detailed logs{'\n'}
-						• Verify that the app navigates to the correct screen{'\n'}
-						• Test with different character encodings
-					</Text>
-				</View>
-			</View>
-		</SafeAreaView>
-	);
+        {/* Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🛠️ Actions</Text>
+          <TouchableOpacity style={styles.button} onPress={clearMetrics}>
+            <Text style={styles.buttonText}>Clear Performance Data</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: Colors.dark.background,
-	},
-	content: {
-		flex: 1,
-		padding: 24,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	title: {
-		fontSize: 28,
-		fontWeight: 'bold',
-		color: Colors.dark.text,
-		textAlign: 'center',
-		marginBottom: 12,
-	},
-	subtitle: {
-		fontSize: 16,
-		color: Colors.dark.textLight,
-		textAlign: 'center',
-		marginBottom: 40,
-		lineHeight: 24,
-	},
-	buttonContainer: {
-		width: '100%',
-		marginBottom: 40,
-	},
-	button: {
-		backgroundColor: Colors.dark.primary,
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 12,
-		alignItems: 'center',
-	},
-	successButton: {
-		backgroundColor: Colors.dark.success,
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 12,
-		alignItems: 'center',
-	},
-	failedButton: {
-		backgroundColor: Colors.dark.error,
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 12,
-		alignItems: 'center',
-	},
-	legacyButton: {
-		backgroundColor: Colors.dark.primary,
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 12,
-		alignItems: 'center',
-	},
-	infoButton: {
-		backgroundColor: Colors.dark.tint,
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 12,
-		alignItems: 'center',
-	},
-	buttonText: {
-		color: Colors.dark.text,
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	infoContainer: {
-		width: '100%',
-		backgroundColor: Colors.dark.tint,
-		borderRadius: 12,
-		padding: 20,
-	},
-	infoTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: Colors.dark.text,
-		marginBottom: 12,
-	},
-	infoText: {
-		fontSize: 14,
-		color: Colors.dark.textLight,
-		lineHeight: 20,
-	},
+  container: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    padding: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  metricItem: {
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: '#3a3a3a',
+    borderRadius: 4,
+  },
+  operationName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  metricText: {
+    fontSize: 12,
+    color: '#cccccc',
+    marginBottom: 2,
+  },
+  slowItem: {
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#ff5722',
+    borderRadius: 4,
+  },
+  slowId: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  slowDuration: {
+    fontSize: 12,
+    color: '#ffffff',
+  },
+  noData: {
+    fontSize: 12,
+    color: '#888888',
+    fontStyle: 'italic',
+  },
+  button: {
+    backgroundColor: '#2196F3',
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  buttonText: {
+    color: '#ffffff',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
 }); 

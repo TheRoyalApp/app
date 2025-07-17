@@ -530,9 +530,9 @@ function RootLayoutNav() {
 
 	console.log('Navigation decision - shouldShowAuth:', shouldShowAuth, 'showFallback:', showFallback);
 
-	// If no user is authenticated, show auth screens
-	if (!user) {
-		console.log('No user detected - showing auth screens');
+	// If no user is authenticated or it's first time, show auth screens
+	if (shouldShowAuth) {
+		console.log('No user detected or first time - showing auth screens');
 		return (
 			<ThemeProvider value={DarkTheme}>
 				<Stack screenOptions={{ headerShown: false }}>
@@ -555,6 +555,13 @@ function RootLayoutNav() {
 		<ThemeProvider value={DarkTheme}>
 			<Stack screenOptions={{ headerShown: false }}>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="auth/welcome" options={{ headerShown: false }} />
+				<Stack.Screen name="auth/login" options={{ headerShown: false }} />
+				<Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+				<Stack.Screen name="admin/index" options={{ headerShown: false }} />
+				<Stack.Screen name="appointment/index" options={{ headerShown: false }} />
+				<Stack.Screen name="appointment/reschedule/[appointmentId]" options={{ headerShown: false }} />
+				{/* Payment screens available even when not authenticated for deep link handling */}
 				<Stack.Screen name="payment/success" options={{ headerShown: false }} />
 				<Stack.Screen name="payment/failed" options={{ headerShown: false }} />
 				<Stack.Screen name="payment/test" options={{ headerShown: false }} />

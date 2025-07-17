@@ -257,12 +257,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Call logout API
       await AuthService.logout();
       
-      // Clear local storage
+      // Clear local storage and reset first time state
       await clearStorage();
+      await deleteItem('hasSeenWelcome');
+      setIsFirstTime(true);
+      
+      console.log('User signed out - redirecting to welcome screen');
     } catch (error) {
       console.error('Sign out error:', error);
       // Clear storage even if API call fails
       await clearStorage();
+      await deleteItem('hasSeenWelcome');
+      setIsFirstTime(true);
     } finally {
       setIsLoading(false);
     }

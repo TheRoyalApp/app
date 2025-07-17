@@ -36,11 +36,11 @@ export default function HistoryScreen() {
 			if (response.success && response.data) {
 				setAppointments(response.data);
 			} else {
-				Alert.alert('Error', 'Failed to load appointments');
+				Alert.alert('Error', 'No se pudieron cargar las citas');
 			}
 		} catch (error) {
 			console.error('Error loading appointments:', error);
-			Alert.alert('Error', 'Failed to load appointments');
+			Alert.alert('Error', 'No se pudieron cargar las citas');
 		} finally {
 			setIsLoading(false);
 		}
@@ -101,7 +101,7 @@ export default function HistoryScreen() {
 			<ScreenWrapper>
 				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 					<ActivityIndicator size="large" color={Colors.dark.primary} />
-					<ThemeText style={{ marginTop: 10 }}>Loading appointments...</ThemeText>
+					<ThemeText style={{ marginTop: 10 }}>Cargando citas...</ThemeText>
 				</View>
 			</ScreenWrapper>
 		);

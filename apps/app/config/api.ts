@@ -93,14 +93,14 @@ export const API_HEADERS = {
 
 // API Timeouts
 export const API_TIMEOUTS = {
-  request: 5000, // 5 seconds (reduced from 10)
-  upload: 30000, // 30 seconds
-  staffRequest: 3000, // 3 seconds for staff requests (faster)
+  request: 3000, // 3 seconds (reduced from 5)
+  upload: 15000, // 15 seconds (reduced from 30)
+  staffRequest: 2000, // 2 seconds for staff requests (faster)
 };
 
 // API Retry Configuration
 export const API_RETRY_CONFIG = {
-  maxRetries: 2, // Reduced from 3
-  retryDelay: 500, // 0.5 seconds (reduced from 1 second)
+  maxRetries: 1, // Reduced from 2
+  retryDelay: 300, // 0.3 seconds (reduced from 0.5)
   retryOnStatusCodes: [408, 429, 500, 502, 503, 504],
 }; 

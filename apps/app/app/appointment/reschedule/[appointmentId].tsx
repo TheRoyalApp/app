@@ -218,13 +218,9 @@ export default function RescheduleScreen() {
     }
 
     if (!user) {
-        return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
-                <Container style={styles.loadingContainer}>
-                    <ThemeText style={styles.loadingText}>No autenticado. Por favor inicia sesión.</ThemeText>
-                </Container>
-            </SafeAreaView>
-        );
+        // Redirect to welcome screen if there's no session
+        router.replace('/auth/welcome');
+        return null;
     }
 
     if (isLoading) {

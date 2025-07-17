@@ -53,14 +53,16 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.imageContainer}>
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.imageText}>✂️</Text>
-            </View>
+            <Image
+              source={require('@/assets/images/icon_transparent.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.description}>
             <Text style={styles.descriptionText}>
-              Reserva tu cita de manera fácil y rápida. 
+              Reserva tu cita de manera fácil y rápida.
               Disfruta de los mejores servicios de barbería.
             </Text>
             <Text style={styles.descriptionSubtext}>
@@ -81,14 +83,6 @@ export default function WelcomeScreen() {
               onPress={handleLogin}
             >
               <Text style={styles.secondaryButtonText}>Ya tengo cuenta</Text>
-            </TouchableOpacity>
-
-            {/* Debug button for iOS testing */}
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={handleClearStorage}
-            >
-              <Text style={styles.debugButtonText}>🔧 Debug: Limpiar Almacenamiento</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -127,18 +121,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 40,
   },
-  imagePlaceholder: {
+  logoImage: {
     width: width * 0.6,
     height: width * 0.6,
     borderRadius: (width * 0.6) / 2,
-    backgroundColor: Colors.dark.gray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.dark.primary,
-  },
-  imageText: {
-    fontSize: 80,
   },
   description: {
     alignItems: 'center',

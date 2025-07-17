@@ -22,6 +22,7 @@ export default function HomeScreen() {
 	const [refreshing, setRefreshing] = useState(false);
 	const [response, setResponse] = useState<any>(null);
 	const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
+	const [hasShownAlert, setHasShownAlert] = useState(false);
 
 	if (__DEV__) {
 		console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading, 'HasAttemptedFetch:', hasAttemptedFetch);
@@ -35,13 +36,17 @@ export default function HomeScreen() {
 			}
 			fetchUpcomingAppointment();
 			setHasAttemptedFetch(true);
+			// Reset alert state when user logs in
+			setHasShownAlert(false);
 		} else if (!user && hasAttemptedFetch) {
 			// Reset state when user becomes unavailable
 			setUpcomingAppointment(null);
 			setHasAttemptedFetch(false);
 			setIsLoading(false);
 		}
-	}, [user, hasAttemptedFetch]);
+	}, [user, hasAttemptedFetch, isLoading, hasShownAlert]);
+
+
 
 	useFocusEffect(
 		useCallback(() => {
@@ -74,6 +79,7 @@ export default function HomeScreen() {
 				return;
 			}
 
+			// Use the optimized API client with caching
 			const response = await AppointmentsService.getUserAppointments();
 
 			if (__DEV__) {
