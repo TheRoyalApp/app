@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
-import { getAllUsers, getUserById, updateUser, deleteUser } from './users.controller.js';
+import { getAllUsers, getUserById, updateUser, deleteUser, searchUserByEmail, updateUserRole } from './users.controller.js';
 import { createUser } from '../use-cases/create-user.js';
 import type { User } from './users.d.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.middleware.js';
@@ -125,6 +125,32 @@ usersRouter.get('/all', authMiddleware, adminMiddleware, async (c: Context) => {
     }
 });
 
+// Search user by email (admin only)
+usersRouter.get('/search', authMiddleware, adminMiddleware, async (c: Context) => {
+    try {
+        const email = c.req.query('email');
+        
+        if (!email) {
+            return c.json(errorResponse(400, 'Email parameter is required'), 400);
+        }
+
+        const { data, error } = await searchUserByEmail(email);
+
+        if (error) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error searching user:', error);
+        return c.json(errorResponse(500, 'Failed to search user'), 500);
+    }
+});
+
 // Get user by id
 usersRouter.get('/:id', authMiddleware, async (c: Context) => {
     const { id } = c.req.param();
@@ -229,6 +255,38 @@ usersRouter.delete('/:id', authMiddleware, adminMiddleware, async (c: Context) =
     } catch (error) {
         console.error('Error deleting user:', error);
         return c.json(errorResponse(500, 'Failed to delete user'), 500);
+    }
+});
+
+// Update user role (admin only)
+usersRouter.put('/:id/role', authMiddleware, adminMiddleware, async (c: Context) => {
+    try {
+        const { id } = c.req.param();
+        const body = await c.req.json();
+        const { role } = body;
+
+        if (!id) {
+            return c.json(errorResponse(400, 'User ID is required'), 400);
+        }
+
+        if (!role || !['customer', 'staff', 'admin'].includes(role)) {
+            return c.json(errorResponse(400, 'Valid role is required (customer, staff, or admin)'), 400);
+        }
+
+        const { data, error } = await updateUserRole(id as string, role);
+
+        if (error) {
+            return c.json(errorResponse(400, error), 400);
+        }
+
+        if (!data) {
+            return c.json(errorResponse(404, 'User not found'), 404);
+        }
+
+        return c.json(successResponse(200, data), 200);
+    } catch (error) {
+        console.error('Error updating user role:', error);
+        return c.json(errorResponse(500, 'Failed to update user role'), 500);
     }
 });
 

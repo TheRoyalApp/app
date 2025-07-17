@@ -38,7 +38,7 @@ interface DaySchedule {
 const AdminPanel = () => {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'availability'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'availability' | 'users'>('appointments');
   const [refreshing, setRefreshing] = useState(false);
   const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
   const [services, setServices] = useState<ApiService[]>([]);
@@ -71,6 +71,10 @@ const AdminPanel = () => {
   const [dateFilter, setDateFilter] = useState<string>('');
   const [barberFilter, setBarberFilter] = useState<string>('');
   const [filteredAppointments, setFilteredAppointments] = useState<ApiAppointment[]>([]);
+  const [userSearchEmail, setUserSearchEmail] = useState<string>('');
+  const [searchedUser, setSearchedUser] = useState<any>(null);
+  const [isSearchingUser, setIsSearchingUser] = useState(false);
+  const [isUpdatingUserRole, setIsUpdatingUserRole] = useState(false);
 
   // Arrays de días para la API y la UI
   // Backend uses: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -178,6 +182,52 @@ const AdminPanel = () => {
   useEffect(() => {
     applyFilters();
   }, [appointments, statusFilter, dateFilter, barberFilter]);
+
+  const searchUserByEmail = async () => {
+    if (!userSearchEmail.trim()) {
+      Alert.alert('Error', 'Por favor ingresa un email');
+      return;
+    }
+
+    setIsSearchingUser(true);
+    try {
+      // Normalize email to lowercase and trim whitespace
+      const normalizedEmail = userSearchEmail.trim().toLowerCase();
+      const response = await apiClient.get(`/users/search?email=${encodeURIComponent(normalizedEmail)}`);
+      
+      if (response.success && response.data) {
+        setSearchedUser(response.data);
+      } else {
+        setSearchedUser(null);
+        Alert.alert('No encontrado', 'No se encontró un usuario con ese email');
+      }
+    } catch (error) {
+      console.error('Error searching user:', error);
+      Alert.alert('Error', 'Error al buscar el usuario');
+      setSearchedUser(null);
+    } finally {
+      setIsSearchingUser(false);
+    }
+  };
+
+  const updateUserRole = async (userId: string, newRole: 'customer' | 'staff' | 'admin') => {
+    setIsUpdatingUserRole(true);
+    try {
+      const response = await apiClient.put(`/users/${userId}/role`, { role: newRole });
+      
+      if (response.success) {
+        Alert.alert('Éxito', `Rol actualizado a ${newRole}`);
+        setSearchedUser(response.data);
+      } else {
+        Alert.alert('Error', response.error || 'Error al actualizar el rol');
+      }
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      Alert.alert('Error', 'Error al actualizar el rol del usuario');
+    } finally {
+      setIsUpdatingUserRole(false);
+    }
+  };
 
   const fetchAllData = async () => {
     if (!user) {
@@ -545,16 +595,30 @@ const AdminPanel = () => {
 
   const getStatusText = (status: ApiAppointment['status']) => {
     switch (status) {
-      case 'confirmed':
-        return 'Confirmada';
-      case 'pending':
-        return 'Pendiente';
-      case 'completed':
-        return 'Completado';
-      case 'cancelled':
-        return 'Cancelado';
-      default:
-        return status;
+      case 'pending': return 'Pendiente';
+      case 'confirmed': return 'Confirmado';
+      case 'completed': return 'Completado';
+      case 'cancelled': return 'Cancelado';
+      case 'no-show': return 'No Show';
+      default: return status;
+    }
+  };
+
+  const getRoleColor = (role: string, isAdmin?: boolean) => {
+    if (isAdmin) return '#dc3545'; // Red for admin
+    switch (role) {
+      case 'staff': return '#ffc107'; // Yellow
+      case 'customer': return '#28a745'; // Green
+      default: return Colors.dark.primary;
+    }
+  };
+
+  const getRoleText = (role: string, isAdmin?: boolean) => {
+    if (isAdmin) return 'Administrador';
+    switch (role) {
+      case 'staff': return 'Barbero';
+      case 'customer': return 'Cliente';
+      default: return role;
     }
   };
 
@@ -982,6 +1046,122 @@ const AdminPanel = () => {
     );
   };
 
+  const renderUsersTab = () => (
+    <View style={{ flex: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 0 }}>
+        <Container>
+          <View style={styles.sectionHeader}>
+            <ThemeText style={styles.sectionTitle}>Gestión de Usuarios</ThemeText>
+            <ThemeText style={styles.appointmentCount}>
+              {isSearchingUser ? 'Buscando...' : searchedUser ? 'Usuario encontrado' : 'Buscar usuario'}
+            </ThemeText>
+          </View>
+
+          {/* Search Section */}
+          <View style={styles.filtersCard}>
+            <View style={styles.filterSection}>
+              <ThemeText style={styles.filterSectionTitle}>📧 Buscar por Email</ThemeText>
+              <View style={styles.dateFilterContainer}>
+                <TextInput
+                  style={styles.dateInputField}
+                  placeholder="Email del usuario..."
+                  value={userSearchEmail}
+                  onChangeText={setUserSearchEmail}
+                  placeholderTextColor={Colors.dark.textLight}
+                />
+                {userSearchEmail && (
+                  <TouchableOpacity 
+                    style={styles.clearDateButton}
+                    onPress={() => {
+                      setUserSearchEmail('');
+                      setSearchedUser(null);
+                    }}
+                  >
+                    <ThemeText style={styles.clearButtonText}>✕</ThemeText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.filterActions}>
+              <TouchableOpacity 
+                style={styles.searchButton}
+                onPress={searchUserByEmail}
+                disabled={isSearchingUser || !userSearchEmail.trim()}
+              >
+                <ThemeText style={styles.searchButtonText}>
+                  {isSearchingUser ? '🔍 Buscando...' : '🔍 Buscar Usuario'}
+                </ThemeText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {isSearchingUser ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.dark.primary} />
+              <ThemeText style={styles.loadingText}>Buscando usuario...</ThemeText>
+            </View>
+          ) : searchedUser ? (
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <ThemeText style={styles.cardTitle}>
+                  {searchedUser.firstName && searchedUser.lastName 
+                    ? `${searchedUser.firstName} ${searchedUser.lastName}` 
+                    : searchedUser.email}
+                </ThemeText>
+                <View style={[styles.statusBadge, { backgroundColor: getRoleColor(searchedUser.role, searchedUser.isAdmin) }]}>
+                  <ThemeText style={{
+                    ...styles.statusText,
+                    color: Colors.dark.background
+                  }}>
+                    {getRoleText(searchedUser.role, searchedUser.isAdmin)}
+                  </ThemeText>
+                </View>
+              </View>
+              <ThemeText style={styles.cardDescription}>Email: {searchedUser.email}</ThemeText>
+              <ThemeText style={styles.cardDescription}>ID: {searchedUser.id}</ThemeText>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.confirmButton]}
+                  onPress={() => updateUserRole(searchedUser.id, 'admin')}
+                  disabled={isUpdatingUserRole || searchedUser.isAdmin}
+                >
+                  <ThemeText style={styles.actionButtonText}>
+                    {isUpdatingUserRole ? 'Actualizando...' : 'Hacer Admin'}
+                  </ThemeText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: '#ffc107', borderColor: '#ffc107' }]}
+                  onPress={() => updateUserRole(searchedUser.id, 'staff')}
+                  disabled={isUpdatingUserRole || (searchedUser.role === 'staff' && !searchedUser.isAdmin)}
+                >
+                  <ThemeText style={styles.actionButtonText}>
+                    {isUpdatingUserRole ? 'Actualizando...' : 'Hacer Barbero'}
+                  </ThemeText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={() => updateUserRole(searchedUser.id, 'customer')}
+                  disabled={isUpdatingUserRole || searchedUser.role === 'customer'}
+                >
+                  <ThemeText style={styles.actionButtonText}>
+                    {isUpdatingUserRole ? 'Actualizando...' : 'Hacer Cliente'}
+                  </ThemeText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <ThemeText style={styles.emptyStateText}>
+                {userSearchEmail ? 'No se encontró ningún usuario con ese email.' : 'Ingresa un email para buscar un usuario.'}
+              </ThemeText>
+            </View>
+          )}
+        </Container>
+      </ScrollView>
+    </View>
+  );
+
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1012,26 +1192,48 @@ const AdminPanel = () => {
           style={[styles.tab, activeTab === 'appointments' && styles.activeTab]}
           onPress={() => setActiveTab('appointments')}
         >
-          <ThemeText style={activeTab === 'appointments' ? styles.activeTabText : styles.tabText}>
-            Citas
+          <ThemeText style={{
+            ...styles.tabText,
+            ...(activeTab === 'appointments' ? styles.activeTabText : {})
+          }}>
+            📅  Citas
           </ThemeText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'services' && styles.activeTab]}
           onPress={() => setActiveTab('services')}
         >
-          <ThemeText style={activeTab === 'services' ? styles.activeTabText : styles.tabText}>
-            Servicios
+          <ThemeText style={{
+            ...styles.tabText,
+            ...(activeTab === 'services' ? styles.activeTabText : {})
+          }}>
+            ✂️ Servicios
           </ThemeText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'availability' && styles.activeTab]}
           onPress={() => setActiveTab('availability')}
         >
-          <ThemeText style={activeTab === 'availability' ? styles.activeTabText : styles.tabText}>
-            Horarios
+          <ThemeText style={{
+            ...styles.tabText,
+            ...(activeTab === 'availability' ? styles.activeTabText : {})
+          }}>
+            🕐 Horarios
           </ThemeText>
         </TouchableOpacity>
+        {user?.isAdmin && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+            onPress={() => setActiveTab('users')}
+          >
+            <ThemeText style={{
+              ...styles.tabText,
+              ...(activeTab === 'users' ? styles.activeTabText : {})
+            }}>
+              👥 Usuarios
+            </ThemeText>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -1048,6 +1250,7 @@ const AdminPanel = () => {
         {activeTab === 'appointments' && renderAppointmentsTab()}
         {activeTab === 'services' && renderServicesTab()}
         {activeTab === 'availability' && renderAvailabilityTab()}
+        {activeTab === 'users' && user?.isAdmin && renderUsersTab()}
       </ScrollView>
 
       <AvailabilityEditor
@@ -1243,6 +1446,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 15,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -1251,6 +1455,8 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     color: Colors.dark.textLight,
+    lineHeight: 25,
+    textAlign: 'center',
   },
   activeTabText: {
     color: Colors.dark.primary,
@@ -1633,6 +1839,7 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontWeight: '600',
     fontSize: 14,
+    textAlign: 'center',
   },
   completeButton: {
     backgroundColor: '#2ecc40',
@@ -1797,6 +2004,19 @@ const styles = StyleSheet.create({
     color: Colors.dark.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  searchButton: {
+    backgroundColor: Colors.dark.primary,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    color: Colors.dark.background,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

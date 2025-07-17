@@ -218,31 +218,6 @@ export default function HomeScreen() {
 				</View>
 
 				<Container>
-					<Button onPress={() => router.push({
-						pathname: '/payment/success',
-						params: {
-							timeSlot: '14:30',
-							appointmentDate: '15/07/2025',
-							serviceName: 'Corte Clásico',
-							barberName: 'Juan Pérez',
-							amount: '250.00'
-						}
-					})}>
-						Test Pago Exitoso
-					</Button>
-					<Button onPress={() => router.push({
-						pathname: '/payment/failed',
-						params: {
-							timeSlot: '14:30',
-							appointmentDate: '15/07/2025',
-							serviceName: 'Corte Clásico',
-							barberName: 'Juan Pérez',
-							amount: '250.00',
-							errorMessage: 'Pago cancelado por el usuario'
-						}
-					})}>
-						Test Pago Fallido
-					</Button>	
 					<View style={{ marginBottom: 20 }}>
 						<ThemeText
 							style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 5 }}
@@ -309,14 +284,14 @@ export default function HomeScreen() {
 						<Button onPress={() => router.push('/appointment')}>
 							Agendar cita
 						</Button>
-						<Button 
-							secondary 
+						<Button
+							secondary
 							disabled={!upcomingAppointment}
 							onPress={() => {
 								console.log('🔍 RESCHEDULE BUTTON CLICKED');
 								console.log('upcomingAppointment:', upcomingAppointment);
 								console.log('user:', user);
-								
+
 								if (upcomingAppointment) {
 									console.log('🔍 RESCHEDULE NAVIGATION DEBUG:', {
 										appointmentId: upcomingAppointment.id,
@@ -324,7 +299,7 @@ export default function HomeScreen() {
 										currentUserId: user?.id,
 										appointment: upcomingAppointment
 									});
-									
+
 									try {
 										// Add a small delay to show button press feedback
 										setTimeout(() => {
@@ -431,19 +406,6 @@ export default function HomeScreen() {
 							</ThemeText>
 						</Link>
 					)}
-
-					{/* Debug button */}
-					<Button
-						secondary
-						onPress={async () => {
-							console.log('🔧 Debug: Clearing storage and redirecting to auth');
-							await clearStorage();
-							router.replace('/auth/welcome');
-						}}
-						style={{ marginTop: 20 }}
-					>
-						🔧 Debug: Ir a Auth
-					</Button>
 				</View>
 			</ScrollView>
 		</ScreenWrapper>

@@ -194,3 +194,76 @@ export async function deleteUser(id: string): Promise<UserResponse> {
         return res;
     }
 }
+
+export async function searchUserByEmail(email: string): Promise<UserResponse> {
+    const res: UserResponse = {
+        data: null,
+        error: null,
+    };
+
+    try {
+        const db = await getDatabase();
+        
+        // Convert email to lowercase for case-insensitive search
+        const normalizedEmail = email.toLowerCase().trim();
+        
+        const user = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+        
+        if (!user[0]) {
+            res.error = 'User not found';
+            return res;
+        }
+
+        res.data = user[0] as User;
+        return res;
+    } catch (error) {
+        console.error('Error searching user by email:', error);
+        res.error = 'Failed to search user';
+        return res;
+    }
+}
+
+export async function updateUserRole(id: string, role: 'customer' | 'staff' | 'admin'): Promise<UserResponse> {
+    const res: UserResponse = {
+        data: null,
+        error: null,
+    };
+
+    try {
+        const db = await getDatabase();
+        
+        // Check if user exists
+        const existingUser = await db.select().from(users).where(eq(users.id, id));
+        if (!existingUser[0]) {
+            res.error = 'User not found';
+            return res;
+        }
+
+        // Update role and isAdmin flag
+        const updateData: any = {
+            updatedAt: new Date()
+        };
+
+        // Handle admin role specially - set isAdmin flag and keep role as 'staff'
+        if (role === 'admin') {
+            updateData.isAdmin = true;
+            updateData.role = 'staff'; // Admin users have staff role with isAdmin=true
+        } else {
+            updateData.isAdmin = false;
+            updateData.role = role; // customer or staff
+        }
+
+        const [updatedUser] = await db
+            .update(users)
+            .set(updateData)
+            .where(eq(users.id, id))
+            .returning();
+
+        res.data = updatedUser as User;
+        return res;
+    } catch (error) {
+        console.error('Error updating user role:', error);
+        res.error = 'Failed to update user role';
+        return res;
+    }
+}
