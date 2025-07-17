@@ -35,39 +35,15 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
       name: '',
       price: 0,
       duration: 30,
-      description: [],
+      description: '',
     }
   );
-  const [newDescription, setNewDescription] = useState('');
 
   const updateService = (field: keyof ServiceInterface, value: any) => {
     setService(prev => ({
       ...prev,
       [field]: value,
     }));
-  };
-
-  const addDescription = () => {
-    if (!newDescription.trim()) {
-      Alert.alert('Error', 'Por favor ingresa una descripción');
-      return;
-    }
-
-    setService(prev => ({
-      ...prev,
-      description: [...prev.description, newDescription.trim()],
-    }));
-    setNewDescription('');
-  };
-
-  const removeDescription = (index: number) => {
-    setService(prev => {
-      const newDescriptions = prev.description.filter((_, i) => i !== index);
-      return {
-        ...prev,
-        description: newDescriptions,
-      };
-    });
   };
 
   const handleSave = () => {
@@ -86,49 +62,16 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
       return;
     }
 
-    const validDescriptions = service.description.filter(desc => typeof desc === 'string' && desc.trim() !== '');
-    if (validDescriptions.length === 0) {
-      Alert.alert('Error', 'Debe haber al menos una descripción válida');
+    if (!service.description || service.description.trim() === '') {
+      Alert.alert('Error', 'Debe ingresar una descripción');
       return;
     }
 
-    // Crear servicio con solo las descripciones válidas
-    const serviceToSave = {
-      ...service,
-      description: validDescriptions
-    };
-
-    onSave(serviceToSave);
+    onSave(service);
     onClose();
   };
 
-  const presetDescriptions = {
-    barber: [
-      'Lavado de cabello',
-      'Corte de cabello',
-      'Peinado y perfume',
-      'Exfoliación',
-      'Vapor caliente y masaje con guante',
-      'Mascarilla puntos negros',
-      'Crema humectante para ojeras',
-      'Perfilación y corte de barba',
-      'Aceite pre-shave',
-      'Aceite de afeitado y exfoliación',
-      'Delineado y afeitado',
-      'Vapor frío y crema humectante',
-      'After shave y perfume',
-    ],
-    spa: [
-      'Limpieza de manos y uñas en seco',
-      'Esmaltado transparente',
-      'Limpieza de pies y uñas',
-      'Tina con sales minerales',
-      'Exfoliación',
-      'Mascarilla con aceites esenciales y relajantes',
-      'Gel semipermanente transparente',
-      'Masaje relajante',
-    ],
-  };
+
 
   return (
     <Modal
@@ -192,57 +135,19 @@ const ServiceEditor: React.FC<ServiceEditorProps> = ({
             <View style={styles.section}>
               <ThemeText style={styles.sectionTitle}>Descripción del Servicio</ThemeText>
               
-              <View style={styles.addDescriptionContainer}>
+              <View style={styles.writtenDescriptionContainer}>
                 <TextInput
-                  style={styles.descriptionInput}
-                  value={newDescription}
-                  onChangeText={setNewDescription}
-                  placeholder="Agregar descripción..."
+                  style={styles.writtenDescriptionInput}
+                  value={service.description}
+                  onChangeText={(text) => updateService('description', text)}
+                  placeholder="Describe detalladamente el servicio que ofreces..."
                   placeholderTextColor={Colors.dark.textLight}
                   multiline
+                  textAlignVertical="top"
                 />
-                <TouchableOpacity style={styles.addButton} onPress={addDescription}>
-                  <ThemeText style={styles.addButtonText}>+</ThemeText>
-                </TouchableOpacity>
               </View>
 
-              <View style={styles.presetContainer}>
-                <ThemeText style={styles.presetTitle}>Descripciones Comunes</ThemeText>
-                <View style={styles.presetButtons}>
-                  {presetDescriptions[category].map((desc) => (
-                    <TouchableOpacity
-                      key={desc}
-                      style={styles.presetButton}
-                      onPress={() => setNewDescription(desc)}
-                    >
-                      <ThemeText style={styles.presetButtonText}>{desc}</ThemeText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
 
-              <View style={styles.descriptionsContainer}>
-                <ThemeText style={styles.descriptionsTitle}>Descripciones Actuales</ThemeText>
-                {service.description.length === 0 ? (
-                  <View style={styles.emptyDescriptions}>
-                    <ThemeText style={styles.emptyDescriptionsText}>
-                      No hay descripciones. Agrega al menos una descripción para continuar.
-                    </ThemeText>
-                  </View>
-                ) : (
-                  service.description.map((desc, index) => (
-                    <View key={index} style={styles.descriptionItem}>
-                      <ThemeText style={styles.descriptionText}>• {desc}</ThemeText>
-                      <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={() => removeDescription(index)}
-                      >
-                        <ThemeText style={styles.removeButtonText}>✕</ThemeText>
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
-              </View>
             </View>
           </Container>
         </ScrollView>
@@ -284,8 +189,6 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.gray,
   },
   sectionTitle: {
     fontSize: 18,
@@ -311,120 +214,16 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     backgroundColor: Colors.dark.background,
   },
-  addDescriptionContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 15,
-  },
-  descriptionInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.dark.gray,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: Colors.dark.text,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    backgroundColor: Colors.dark.background,
-  },
-  addButton: {
-    backgroundColor: Colors.dark.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: Colors.dark.background,
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  presetContainer: {
-    marginBottom: 20,
-  },
-  presetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: Colors.dark.text,
-  },
-  presetButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  presetButton: {
-    backgroundColor: Colors.dark.gray,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.dark.primary,
-  },
-  presetButtonText: {
-    color: Colors.dark.text,
-    fontSize: 12,
-  },
-  descriptionsContainer: {
-    gap: 8,
-  },
-  descriptionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: Colors.dark.text,
-  },
-  emptyDescriptions: {
-    backgroundColor: Colors.dark.gray,
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.textLight,
-    alignItems: 'center',
-  },
-  emptyDescriptionsText: {
-    fontSize: 14,
-    color: Colors.dark.textLight,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  descriptionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.gray,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.primary,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: Colors.dark.text,
-    flex: 1,
-  },
-  removeButton: {
-    backgroundColor: '#ff3b30',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: Colors.dark.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
+
+
+
   footer: {
+    height: 150,
+    flexDirection: 'column',
+    padding: 20,
+    gap: 15,
     borderTopWidth: 1,
     borderTopColor: Colors.dark.gray,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    gap: 16,
   },
   cancelButton: {
     flex: 1,
@@ -437,6 +236,46 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 48,
     borderRadius: 10,
+  },
+  descriptionModeToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 15,
+    backgroundColor: Colors.dark.gray,
+    borderRadius: 8,
+    paddingVertical: 5,
+  },
+  modeButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  modeButtonActive: {
+    backgroundColor: Colors.dark.primary,
+    borderWidth: 1,
+    borderColor: Colors.dark.primary,
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.dark.text,
+  },
+  modeButtonTextActive: {
+    color: Colors.dark.background,
+  },
+  writtenDescriptionContainer: {
+    marginBottom: 20,
+  },
+  writtenDescriptionInput: {
+    borderWidth: 1,
+    borderColor: Colors.dark.gray,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: Colors.dark.text,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    backgroundColor: Colors.dark.background,
   },
 });
 

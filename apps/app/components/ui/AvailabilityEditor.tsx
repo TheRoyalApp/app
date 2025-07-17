@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  TextInput,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +31,20 @@ interface AvailabilityEditorProps {
   initialSchedule?: DaySchedule;
 }
 
+// Generate time options from 6:00 AM to 11:00 PM in 1-hour intervals
+const generateTimeOptions = () => {
+  const options = [];
+  for (let hour = 6; hour <= 23; hour++) {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+    const timeString = `${displayHour.toString().padStart(2, '0')}:00 ${period}`;
+    options.push(timeString);
+  }
+  return options;
+};
+
+const timeOptions = generateTimeOptions();
+
 const AvailabilityEditor: React.FC<AvailabilityEditorProps> = ({
   visible,
   onClose,
@@ -42,41 +55,36 @@ const AvailabilityEditor: React.FC<AvailabilityEditorProps> = ({
     initialSchedule || {
       day: 'default',
       isOpen: true,
-      timeSlots: [
-        { id: '1', time: '09:00 AM' },
-        { id: '2', time: '09:30 AM' },
-        { id: '3', time: '10:00 AM' },
-        { id: '4', time: '10:30 AM' },
-        { id: '5', time: '11:00 AM' },
-        { id: '6', time: '11:30 AM' },
-        { id: '7', time: '12:00 PM' },
-        { id: '8', time: '12:30 PM' },
-        { id: '9', time: '02:00 PM' },
-        { id: '10', time: '02:30 PM' },
-        { id: '11', time: '03:00 PM' },
-        { id: '12', time: '03:30 PM' },
-        { id: '13', time: '04:00 PM' },
-        { id: '14', time: '04:30 PM' },
-      ],
+      timeSlots: [],
     }
   );
 
-  const [newTime, setNewTime] = useState('');
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
 
-  const addTimeSlot = () => {
-    if (!newTime.trim()) {
-      Alert.alert('Error', 'Por favor ingresa un horario válido');
+  const addTimeSlots = () => {
+    if (selectedTimes.length === 0) {
+      Alert.alert('Error', 'Por favor selecciona al menos un horario');
       return;
     }
 
-    const newSlot: TimeSlot = {
-      id: Date.now().toString(),
-      time: newTime.trim(),
-    };
+    // Filter out times that already exist
+    const newTimes = selectedTimes.filter(time => 
+      !schedule.timeSlots.some(slot => slot.time === time)
+    );
+
+    if (newTimes.length === 0) {
+      Alert.alert('Error', 'Todos los horarios seleccionados ya están configurados');
+      return;
+    }
+
+    const newSlots: TimeSlot[] = newTimes.map(time => ({
+      id: Date.now().toString() + Math.random(),
+      time: time,
+    }));
 
     setSchedule(prev => ({
       ...prev,
-      timeSlots: [...prev.timeSlots, newSlot].sort((a, b) => {
+      timeSlots: [...prev.timeSlots, ...newSlots].sort((a, b) => {
         // Sort by time
         const timeA = new Date(`2000-01-01 ${a.time}`);
         const timeB = new Date(`2000-01-01 ${b.time}`);
@@ -84,7 +92,7 @@ const AvailabilityEditor: React.FC<AvailabilityEditorProps> = ({
       }),
     }));
 
-    setNewTime('');
+    setSelectedTimes([]);
   };
 
   const removeTimeSlot = (id: string) => {
@@ -109,13 +117,6 @@ const AvailabilityEditor: React.FC<AvailabilityEditorProps> = ({
     onSave(schedule);
     onClose();
   };
-
-  const presetTimes = [
-    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
-    '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
-    '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
-  ];
 
   return (
     <Modal
@@ -152,51 +153,78 @@ const AvailabilityEditor: React.FC<AvailabilityEditorProps> = ({
             {schedule.isOpen && (
               <>
                 <View style={styles.section}>
-                  <ThemeText style={styles.sectionTitle}>Agregar Horario</ThemeText>
-                  <View style={styles.addTimeContainer}>
-                    <TextInput
-                      style={styles.timeInput}
-                      placeholder="Ej: 09:00 AM"
-                      value={newTime}
-                      onChangeText={setNewTime}
-                      placeholderTextColor={Colors.dark.textLight}
-                    />
-                    <TouchableOpacity style={styles.addButton} onPress={addTimeSlot}>
-                      <ThemeText style={styles.addButtonText}>+</ThemeText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.section}>
-                  <ThemeText style={styles.sectionTitle}>Horarios Rápidos</ThemeText>
-                  <View style={styles.presetContainer}>
-                    {presetTimes.map((time) => (
-                      <TouchableOpacity
-                        key={time}
-                        style={styles.presetButton}
-                        onPress={() => setNewTime(time)}
-                      >
-                        <ThemeText style={styles.presetButtonText}>{time}</ThemeText>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.section}>
-                  <ThemeText style={styles.sectionTitle}>Horarios Configurados</ThemeText>
-                  <View style={styles.timeSlotsContainer}>
-                    {schedule.timeSlots.map((slot) => (
-                      <View key={slot.id} style={styles.timeSlotItem}>
-                        <ThemeText style={styles.timeSlotText}>{slot.time}</ThemeText>
+                  <ThemeText style={styles.sectionTitle}>Seleccionar Horario</ThemeText>
+                  <ThemeText style={styles.sectionSubtitle}>
+                    Selecciona horarios disponibles en intervalos de 1 hora
+                  </ThemeText>
+                  <View style={styles.timeOptionsContainer}>
+                    {timeOptions.map((time) => {
+                      const isSelected = selectedTimes.includes(time);
+                      const isAlreadyAdded = schedule.timeSlots.some(slot => slot.time === time);
+                      
+                      return (
                         <TouchableOpacity
-                          style={styles.removeButton}
-                          onPress={() => removeTimeSlot(slot.id)}
+                          key={time}
+                          style={[
+                            styles.timeOptionButton,
+                            isSelected && styles.timeOptionSelected,
+                            isAlreadyAdded && styles.timeOptionDisabled
+                          ]}
+                          onPress={() => {
+                            if (!isAlreadyAdded) {
+                              setSelectedTimes(prev => 
+                                isSelected 
+                                  ? prev.filter(t => t !== time)
+                                  : [...prev, time]
+                              );
+                            }
+                          }}
+                          disabled={isAlreadyAdded}
                         >
-                          <ThemeText style={styles.removeButtonText}>✕</ThemeText>
+                          <ThemeText style={{
+                            ...styles.timeOptionText,
+                            ...(isSelected && styles.timeOptionTextSelected),
+                            ...(isAlreadyAdded && styles.timeOptionTextDisabled)
+                          }}>
+                            {time}
+                          </ThemeText>
                         </TouchableOpacity>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
+                  {selectedTimes.length > 0 && (
+                    <TouchableOpacity 
+                      style={styles.addButton} 
+                      onPress={addTimeSlots}
+                    >
+                      <ThemeText style={styles.addButtonText}>
+                        Agregar {selectedTimes.length} horario{selectedTimes.length > 1 ? 's' : ''}
+                      </ThemeText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={styles.sectionLast}>
+                  <ThemeText style={styles.sectionTitle}>Horarios Configurados</ThemeText>
+                  {schedule.timeSlots.length === 0 ? (
+                    <ThemeText style={styles.noSlotsText}>
+                      No hay horarios configurados. Selecciona horarios de la lista arriba.
+                    </ThemeText>
+                  ) : (
+                    <View style={styles.timeSlotsContainer}>
+                      {schedule.timeSlots.map((slot) => (
+                        <View key={slot.id} style={styles.timeSlotItem}>
+                          <ThemeText style={styles.timeSlotText}>{slot.time}</ThemeText>
+                          <TouchableOpacity
+                            style={styles.removeButton}
+                            onPress={() => removeTimeSlot(slot.id)}
+                          >
+                            <ThemeText style={styles.removeButtonText}>✕</ThemeText>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               </>
             )}
@@ -247,11 +275,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.gray,
   },
+  sectionLast: {
+    paddingVertical: 20,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 8,
     color: Colors.dark.text,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    marginBottom: 15,
   },
   openStatusContainer: {
     flexDirection: 'row',
@@ -273,51 +309,62 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontWeight: '600',
   },
-  addTimeContainer: {
+  timeOptionsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 15,
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
+    justifyContent: 'space-between',
   },
-  timeInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.dark.gray,
+  timeOptionButton: {
+    backgroundColor: Colors.dark.gray,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.primary,
+    width: '48%',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  timeOptionSelected: {
+    backgroundColor: Colors.dark.primary,
+  },
+  timeOptionDisabled: {
+    backgroundColor: Colors.dark.gray,
+    opacity: 0.5,
+    borderColor: Colors.dark.textLight,
+  },
+  timeOptionText: {
     color: Colors.dark.text,
-    backgroundColor: Colors.dark.background,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  timeOptionTextSelected: {
+    color: Colors.dark.background,
+    fontWeight: 'bold',
+  },
+  timeOptionTextDisabled: {
+    color: Colors.dark.textLight,
   },
   addButton: {
     backgroundColor: Colors.dark.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    marginTop: 10,
   },
   addButtonText: {
     color: Colors.dark.background,
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  presetContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  presetButton: {
-    backgroundColor: Colors.dark.gray,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.dark.primary,
-  },
-  presetButtonText: {
-    color: Colors.dark.text,
+  noSlotsText: {
     fontSize: 14,
+    color: Colors.dark.textLight,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   timeSlotsContainer: {
     gap: 8,
@@ -351,7 +398,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   footer: {
-    flexDirection: 'row',
+    height: 150,
+    flexDirection: 'column',
     padding: 20,
     gap: 15,
     borderTopWidth: 1,
