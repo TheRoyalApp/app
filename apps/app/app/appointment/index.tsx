@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 
 // React Native core imports
-import { StatusBar, View, FlatList, ScrollView, Alert, ActivityIndicator, Pressable, Linking } from 'react-native';
+import { StatusBar, View, FlatList, ScrollView, Alert, ActivityIndicator, Pressable, Linking, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -652,16 +652,21 @@ export default function AppointmentScreen() {
 
 	// Always render the main screen, handle loading states within the content
 	return (
-		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading} edges={['bottom']}>
+		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading} edges={['top', 'bottom']}>
 			<Stack.Screen
 				options={{
-					headerShown: true,
-					title: 'Agendar Cita',
-					headerBackTitle: 'Volver',
-					headerStyle: { backgroundColor: Colors.dark.background },
-					headerTintColor: '#fff'
+					headerShown: false
 				}}
 			/>
+			
+			{/* Custom Header */}
+			<View style={styles.header}>
+				<TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+					<ThemeText style={styles.backButtonText}>← Volver</ThemeText>
+				</TouchableOpacity>
+				<ThemeText style={styles.headerTitle}>Agendar Cita</ThemeText>
+				<View style={styles.headerSpacer} />
+			</View>
 			
 			<ScrollView contentContainerStyle={{ paddingTop: 0 }}>
 				<Container style={{ paddingBottom: 30 }}>
@@ -1094,3 +1099,33 @@ export default function AppointmentScreen() {
 		</ScreenWrapper>
 	);
 }
+
+const styles = StyleSheet.create({
+	header: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		backgroundColor: Colors.dark.background,
+		borderBottomWidth: 1,
+		borderBottomColor: Colors.dark.gray,
+	},
+	backButton: {
+		flex: 1,
+	},
+	backButtonText: {
+		fontSize: 16,
+		color: Colors.dark.primary,
+	},
+	headerTitle: {
+		fontSize: 18,
+		fontWeight: 'bold',
+		color: Colors.dark.text,
+		textAlign: 'center',
+		flex: 2,
+	},
+	headerSpacer: {
+		flex: 1,
+	},
+});

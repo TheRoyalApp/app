@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { ThemeText, Container } from '@/components/Themed';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '@/constants/Colors';
@@ -11,6 +11,7 @@ import { AppointmentsService } from '@/services';
 import { Appointment } from '@/services';
 import { apiClient } from '@/services/api';
 import { useAuth } from '@/components/auth/AuthContext';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 
 export default function RescheduleScreen() {
     const { appointmentId } = useLocalSearchParams();
@@ -208,12 +209,12 @@ export default function RescheduleScreen() {
 
     if (authLoading) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
+            <ScreenWrapper>
                 <Container style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Colors.dark.primary} />
                     <ThemeText style={styles.loadingText}>Cargando autenticación...</ThemeText>
                 </Container>
-            </SafeAreaView>
+            </ScreenWrapper>
         );
     }
 
@@ -225,7 +226,7 @@ export default function RescheduleScreen() {
 
     if (isLoading) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }} edges={['top', 'bottom']}>
                 <Container style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Colors.dark.primary} />
                     <ThemeText style={styles.loadingText}>Cargando información de la cita...</ThemeText>
@@ -236,7 +237,7 @@ export default function RescheduleScreen() {
 
     if (!appointment) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }} edges={['top', 'bottom']}>
                 <Container style={styles.container}>
                     <ThemeText style={styles.errorText}>No se encontró la cita especificada.</ThemeText>
                     <Button onPress={() => router.back()}>
@@ -248,17 +249,22 @@ export default function RescheduleScreen() {
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }} edges={['bottom']}>
-            <StatusBar barStyle="light-content" />
+        <ScreenWrapper showBottomFade={true} showTopFade={false} edges={['top', 'bottom']}>
             <Stack.Screen
                 options={{
-                    headerShown: true,
-                    title: 'Reprogramar Cita',
-                    headerBackTitle: 'Volver',
-                    headerStyle: { backgroundColor: Colors.dark.background },
-                    headerTintColor: '#fff'
+                    headerShown: false
                 }}
             />
+            
+            {/* Custom Header */}
+            <View style={styles.header}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <ThemeText style={styles.backButtonText}>← Volver</ThemeText>
+                </TouchableOpacity>
+                <ThemeText style={styles.headerTitle}>Reprogramar Cita</ThemeText>
+                <View style={styles.headerSpacer} />
+            </View>
+            
             <ScrollView style={styles.scrollView}>
                 <Container style={styles.container}>
                     {/* Current Appointment Info */}
@@ -364,7 +370,7 @@ export default function RescheduleScreen() {
                     )}
                 </Container>
             </ScrollView>
-        </SafeAreaView>
+        </ScreenWrapper>
     );
 }
 
@@ -441,5 +447,32 @@ const styles = StyleSheet.create({
     statusSubtext: {
         fontSize: 12,
         color: Colors.dark.textLight,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: Colors.dark.background,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.dark.gray,
+    },
+    backButton: {
+        flex: 1,
+    },
+    backButtonText: {
+        fontSize: 16,
+        color: Colors.dark.primary,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: Colors.dark.text,
+        textAlign: 'center',
+        flex: 2,
+    },
+    headerSpacer: {
+        flex: 1,
     },
 });

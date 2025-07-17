@@ -1,8 +1,23 @@
+import { Platform } from 'react-native';
+
+// Get the correct localhost URL for Android
+const getDevBaseURL = () => {
+  if (Platform.OS === 'android') {
+    // For physical Android device, uncomment and use your machine's IP address:
+    // return 'http://192.168.1.XXX:3001'; // Replace XXX with your machine's IP
+    
+    // For Android emulator, use 10.0.2.2 (maps to host machine's localhost)
+    return process.env.EXPO_PUBLIC_DEV_API_URL || 'http://10.0.2.2:3001';
+  }
+  // For iOS simulator and web
+  return 'http://localhost:3001';
+};
+
 // API Configuration
 export const API_CONFIG = {
   // Development
   development: {
-    baseURL: 'http://localhost:3001',
+    baseURL: getDevBaseURL(),
   },
   
   // Production - UPDATE THIS WITH YOUR ACTUAL PRODUCTION URL
