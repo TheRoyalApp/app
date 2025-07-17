@@ -63,6 +63,14 @@ const AdminPanel = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [barberNames, setBarberNames] = useState<{ [id: string]: string }>({});
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [appointmentsLoaded, setAppointmentsLoaded] = useState(0);
+  const [totalAppointments, setTotalAppointments] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('');
+  const [barberFilter, setBarberFilter] = useState<string>('');
+  const [filteredAppointments, setFilteredAppointments] = useState<ApiAppointment[]>([]);
 
   // Arrays de días para la API y la UI
   // Backend uses: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -127,6 +135,50 @@ const AdminPanel = () => {
     }
   }, [schedules]);
 
+  const applyFilters = () => {
+    let filtered = appointments;
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(apt => apt.status === statusFilter);
+    }
+
+    // Filter by date (DD/MM/YYYY format)
+    if (dateFilter) {
+      filtered = filtered.filter(apt => {
+        try {
+          // Convert DD/MM/YYYY to Date object
+          const [day, month, year] = dateFilter.split('/');
+          const filterDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          
+          // Convert appointment date to Date object
+          const aptDate = new Date(apt.appointmentDate);
+          
+          return aptDate.toDateString() === filterDate.toDateString();
+        } catch (error) {
+          console.error('Error parsing date filter:', error);
+          return true; // Show all if date parsing fails
+        }
+      });
+    }
+
+    // Filter by barber (for admin users)
+    if (barberFilter && user?.isAdmin) {
+      filtered = filtered.filter(apt => {
+        const a = apt as any;
+        const barberFullName = `${a.barberName || ''} ${a.barberLastName || ''}`.trim().toLowerCase();
+        return barberFullName.includes(barberFilter.toLowerCase());
+      });
+    }
+
+    setFilteredAppointments(filtered);
+  };
+
+  // Apply filters whenever appointments or filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [appointments, statusFilter, dateFilter, barberFilter]);
+
   const fetchAllData = async () => {
     if (!user) {
       console.log('fetchAllData: No user, aborting fetch.');
@@ -135,14 +187,63 @@ const AdminPanel = () => {
     setRefreshing(true);
     // Appointments
     if (activeTab === 'appointments') {
-      // Both admin and staff fetch all non-closed appointments
-      const res = await AppointmentsService.getAllAppointments();
-      console.log('Fetched appointments:', res);
-      if (res && res.success && res.data) {
-        // Filter to show only non-closed appointments (pending, confirmed, cancelled)
-        // Exclude completed appointments as they are considered "closed"
-        setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
-      } else setAppointments([]);
+      if (user.isAdmin) {
+        // Admin sees all appointments with progressive loading
+        setIsLoadingAppointments(true);
+        setAppointmentsLoaded(0);
+        setTotalAppointments(0);
+        
+        try {
+          const res = await AppointmentsService.getAllAppointments();
+          console.log('Fetched all appointments for admin:', res);
+          if (res && res.success && res.data) {
+            const allAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
+            setTotalAppointments(allAppointments.length);
+            
+            // Load appointments progressively in batches of 10
+            const batchSize = 10;
+            const appointmentsToShow = [];
+            
+            for (let i = 0; i < allAppointments.length; i += batchSize) {
+              const batch = allAppointments.slice(i, i + batchSize);
+              appointmentsToShow.push(...batch);
+              setAppointments(appointmentsToShow);
+              setAppointmentsLoaded(appointmentsToShow.length);
+              
+              // Add a small delay to show progressive loading
+              if (i + batchSize < allAppointments.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            }
+          } else {
+            setAppointments([]);
+            setTotalAppointments(0);
+          }
+        } catch (error) {
+          console.error('Error loading appointments for admin:', error);
+          setAppointments([]);
+        } finally {
+          setIsLoadingAppointments(false);
+        }
+      } else if (user.role === 'staff') {
+        // Staff sees only their own appointments
+        const res = await AppointmentsService.getBarberAppointments(user.id);
+        console.log('Fetched barber appointments for staff:', res);
+        if (res && res.success && res.data) {
+          // Filter to show only non-closed appointments (pending, confirmed, cancelled)
+          // Exclude completed appointments as they are considered "closed"
+          setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
+        } else setAppointments([]);
+      } else {
+        // Regular users see only their own appointments
+        const res = await AppointmentsService.getUserAppointments();
+        console.log('Fetched user appointments:', res);
+        if (res && res.success && res.data) {
+          // Filter to show only non-closed appointments (pending, confirmed, cancelled)
+          // Exclude completed appointments as they are considered "closed"
+          setAppointments(res.data.filter((apt: any) => apt.status !== 'completed'));
+        } else setAppointments([]);
+      }
     }
     // Services
     if (activeTab === 'services') {
@@ -193,7 +294,18 @@ const AdminPanel = () => {
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatDateToDDMMYYYY = (isoDate: string) => {
+    const date = new Date(isoDate);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const updateAppointmentStatus = async (id: string, status: ApiAppointment['status']) => {
@@ -470,51 +582,203 @@ const AdminPanel = () => {
     }
   };
 
-  const formatDateToDDMMYYYY = (isoDate: string) => {
-    if (!isoDate) return '';
-    const [year, month, day] = isoDate.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
   const renderAppointmentsTab = () => (
     <View style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 0 }}>
         <Container>
           <View style={styles.sectionHeader}>
             <ThemeText style={styles.sectionTitle}>Citas Programadas</ThemeText>
-            <ThemeText style={styles.appointmentCount}>{appointments.length} citas</ThemeText>
+            <View style={styles.headerRight}>
+              <TouchableOpacity 
+                style={styles.filterToggleButton}
+                onPress={() => setShowFilters(!showFilters)}
+              >
+                <ThemeText style={styles.filterToggleText}>
+                  🔍 {showFilters ? 'Ocultar' : 'Filtros'}
+                </ThemeText>
+              </TouchableOpacity>
+              <ThemeText style={styles.appointmentCount}>
+                {isLoadingAppointments ? `${appointmentsLoaded}/${totalAppointments}` : filteredAppointments.length} citas
+              </ThemeText>
+            </View>
           </View>
-          {appointments.length === 0 ? (
+
+          {/* Enhanced Filters Section */}
+          {showFilters && (
+            <View style={styles.filtersCard}>
+              <View style={styles.filterSection}>
+                <ThemeText style={styles.filterSectionTitle}>📊 Estado de la Cita</ThemeText>
+                <View style={styles.statusFilterContainer}>
+                  {[
+                    { key: 'all', label: 'Todas', color: '#6c757d' },
+                    { key: 'pending', label: 'Pendientes', color: '#ffc107' },
+                    { key: 'confirmed', label: 'Confirmadas', color: '#28a745' },
+                    { key: 'cancelled', label: 'Canceladas', color: '#dc3545' }
+                  ].map(status => (
+                    <TouchableOpacity
+                      key={status.key}
+                      style={[
+                        styles.statusFilterButton,
+                        statusFilter === status.key && styles.statusFilterButtonActive,
+                        { borderColor: status.color }
+                      ]}
+                      onPress={() => setStatusFilter(status.key)}
+                    >
+                      <ThemeText style={{
+                        ...styles.statusFilterText,
+                        ...(statusFilter === status.key ? styles.statusFilterTextActive : {})
+                      }}>
+                        {status.label}
+                      </ThemeText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterSection}>
+                <ThemeText style={styles.filterSectionTitle}>📅 Fecha Específica</ThemeText>
+                <View style={styles.dateFilterContainer}>
+                  <TextInput
+                    style={styles.dateInputField}
+                    placeholder="DD/MM/YYYY (ej: 15/12/2024)"
+                    value={dateFilter}
+                    onChangeText={setDateFilter}
+                    placeholderTextColor={Colors.dark.textLight}
+                  />
+                  {dateFilter && (
+                    <TouchableOpacity 
+                      style={styles.clearDateButton}
+                      onPress={() => setDateFilter('')}
+                    >
+                      <ThemeText style={styles.clearButtonText}>✕</ThemeText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {user?.isAdmin && (
+                <View style={styles.filterSection}>
+                  <ThemeText style={styles.filterSectionTitle}>👨‍💼 Buscar por Barbero</ThemeText>
+                  <View style={styles.barberFilterContainer}>
+                    <TextInput
+                      style={styles.barberInputField}
+                      placeholder="Escribe el nombre del barbero..."
+                      value={barberFilter}
+                      onChangeText={setBarberFilter}
+                      placeholderTextColor={Colors.dark.textLight}
+                    />
+                    {barberFilter && (
+                      <TouchableOpacity 
+                        style={styles.clearBarberButton}
+                        onPress={() => setBarberFilter('')}
+                      >
+                        <ThemeText style={styles.clearButtonText}>✕</ThemeText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.filterActions}>
+                <TouchableOpacity 
+                  style={styles.clearAllFiltersButton}
+                  onPress={() => {
+                    setStatusFilter('all');
+                    setDateFilter('');
+                    setBarberFilter('');
+                  }}
+                >
+                  <ThemeText style={styles.clearAllFiltersText}>🗑️ Limpiar Filtros</ThemeText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {isLoadingAppointments ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.dark.primary} />
+              <ThemeText style={styles.loadingText}>Cargando citas...</ThemeText>
+              {totalAppointments > 0 && (
+                <ThemeText style={styles.progressText}>
+                  {appointmentsLoaded} de {totalAppointments} citas cargadas
+                </ThemeText>
+              )}
+            </View>
+          ) : filteredAppointments.length === 0 ? (
             <View style={styles.emptyState}>
               <ThemeText style={styles.emptyStateText}>No hay citas programadas</ThemeText>
             </View>
           ) : (
-            appointments.map((appointment) => {
+            filteredAppointments.map((appointment) => {
               const a = appointment as any;
               return (
                 <View key={appointment.id} style={styles.card}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <ThemeText style={styles.cardTitle}>{a.customerName || appointment.user?.name || appointment.userId}</ThemeText>
+                    <View style={styles.customerTitleContainer}>
+                      <ThemeText style={styles.customerIcon}>👤</ThemeText>
+                      <ThemeText style={styles.cardTitle}>
+                        {a.customerName && a.customerLastName 
+                          ? `${a.customerName} ${a.customerLastName}` 
+                          : a.customerName || appointment.user?.name || appointment.userId}
+                      </ThemeText>
+                    </View>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(appointment.status) }]}> 
                       <ThemeText style={styles.statusText}>{getStatusText(appointment.status)}</ThemeText>
                     </View>
                   </View>
                   <ThemeText style={styles.cardPrice}>{a.serviceName || appointment.service?.name || appointment.serviceId}</ThemeText>
                   <ThemeText style={styles.cardDescription}>{formatDate(appointment.appointmentDate)} - {appointment.timeSlot}</ThemeText>
-                  <ThemeText style={styles.cardDescription}>{appointment.user?.email || ''}</ThemeText>
-                  <View style={{ flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'confirmed')} style={[styles.confirmButton, { backgroundColor: Colors.dark.primary, borderColor: Colors.dark.primary }]} disabled={updatingId === appointment.id + 'confirmed'}>
-                      {updatingId === appointment.id + 'confirmed' ? <ActivityIndicator color="#fff" /> : 'Confirmar'}
-                    </Button>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'pending')} style={[styles.confirmButton, { backgroundColor: '#FFA500', borderColor: '#FFA500' }]} disabled={updatingId === appointment.id + 'pending'}>
-                      {updatingId === appointment.id + 'pending' ? <ActivityIndicator color="#fff" /> : 'Pendiente'}
-                    </Button>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'completed')} style={[styles.confirmButton, { backgroundColor: '#2ecc40', borderColor: '#2ecc40' }]} disabled={updatingId === appointment.id + 'completed'}>
-                      {updatingId === appointment.id + 'completed' ? <ActivityIndicator color="#fff" /> : 'Completar'}
-                    </Button>
-                    <Button onPress={() => updateAppointmentStatus(appointment.id, 'cancelled')} style={styles.cancelButton} disabled={updatingId === appointment.id + 'cancelled'}>
-                      {updatingId === appointment.id + 'cancelled' ? <ActivityIndicator color="#fff" /> : 'Cancelar'}
-                    </Button>
+                  <ThemeText style={styles.cardDescription}>{a.customerEmail || appointment.user?.email || ''}</ThemeText>
+                  {user?.isAdmin && a.barberName && (
+                    <View style={styles.barberContainer}>
+                      <ThemeText style={styles.barberLabel}>👨‍💼 BARBERO:</ThemeText>
+                      <ThemeText style={styles.barberName}>
+                        {a.barberName} {a.barberLastName || ''}
+                      </ThemeText>
+                    </View>
+                  )}
+                  {user?.role === 'staff' && (
+                    <View style={styles.customerContainer}>
+                      <ThemeText style={styles.customerLabel}>👤 CLIENTE:</ThemeText>
+                      <ThemeText style={styles.customerName}>
+                        {a.customerName} {a.customerLastName || ''}
+                      </ThemeText>
+                    </View>
+                  )}
+                  <View style={styles.actionButtons}>
+                    {appointment.status === 'pending' && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.confirmButton]}
+                          onPress={() => updateAppointmentStatus(appointment.id, 'confirmed')}
+                          disabled={updatingId === appointment.id + 'confirmed'}
+                        >
+                          <ThemeText style={styles.actionButtonText}>
+                            {updatingId === appointment.id + 'confirmed' ? 'Confirmando...' : 'Confirmar'}
+                          </ThemeText>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.cancelButton]}
+                          onPress={() => updateAppointmentStatus(appointment.id, 'cancelled')}
+                          disabled={updatingId === appointment.id + 'cancelled'}
+                        >
+                          <ThemeText style={styles.actionButtonText}>
+                            {updatingId === appointment.id + 'cancelled' ? 'Cancelando...' : 'Cancelar'}
+                          </ThemeText>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                    {appointment.status === 'confirmed' && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.completeButton]}
+                        onPress={() => updateAppointmentStatus(appointment.id, 'completed')}
+                        disabled={updatingId === appointment.id + 'completed'}
+                      >
+                        <ThemeText style={styles.actionButtonText}>
+                          {updatingId === appointment.id + 'completed' ? 'Completando...' : 'Completar'}
+                        </ThemeText>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -1063,12 +1327,10 @@ const styles = StyleSheet.create({
   confirmButton: {
     backgroundColor: Colors.dark.primary,
     borderColor: Colors.dark.primary,
-    flex: 1,
   },
   cancelButton: {
-    backgroundColor: '#ff3b30',
-    borderColor: '#ff3b30',
-    flex: 1,
+    backgroundColor: '#e74c3c',
+    borderColor: '#e74c3c',
   },
   editServiceButton: {
     padding: 6,
@@ -1331,6 +1593,210 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: Colors.dark.textLight,
+    fontSize: 16,
+  },
+  progressText: {
+    marginTop: 10,
+    color: Colors.dark.textLight,
+    fontSize: 14,
+  },
+  barberInfo: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: Colors.dark.background,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  completeButton: {
+    backgroundColor: '#2ecc40',
+    borderColor: '#2ecc40',
+  },
+  customerInfo: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  barberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  barberLabel: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    marginRight: 5,
+  },
+  barberName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.dark.text,
+  },
+  customerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  customerLabel: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    marginRight: 5,
+  },
+  customerName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.dark.text,
+  },
+  customerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customerIcon: {
+    fontSize: 20,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  filterToggleButton: {
+    backgroundColor: Colors.dark.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  filterToggleText: {
+    color: Colors.dark.background,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  filtersCard: {
+    backgroundColor: Colors.dark.gray,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: Colors.dark.primary,
+  },
+  filterSection: {
+    marginBottom: 15,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.dark.text,
+    marginBottom: 10,
+  },
+  statusFilterContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusFilterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: Colors.dark.gray,
+  },
+  statusFilterButtonActive: {
+    backgroundColor: Colors.dark.primary,
+    borderColor: Colors.dark.primary,
+  },
+  statusFilterText: {
+    fontSize: 13,
+    color: Colors.dark.textLight,
+    fontWeight: '600',
+  },
+  statusFilterTextActive: {
+    color: Colors.dark.background,
+  },
+  dateFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.gray,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.gray,
+  },
+  dateInputField: {
+    flex: 1,
+    paddingVertical: 10,
+    color: Colors.dark.text,
+    fontSize: 14,
+  },
+  clearDateButton: {
+    padding: 5,
+  },
+  clearButtonText: {
+    fontSize: 16,
+    color: Colors.dark.textLight,
+  },
+  barberFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.gray,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.gray,
+  },
+  barberInputField: {
+    flex: 1,
+    paddingVertical: 10,
+    color: Colors.dark.text,
+    fontSize: 14,
+  },
+  clearBarberButton: {
+    padding: 5,
+  },
+  filterActions: {
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  clearAllFiltersButton: {
+    backgroundColor: Colors.dark.gray,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.dark.primary,
+  },
+  clearAllFiltersText: {
+    color: Colors.dark.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -174,8 +174,6 @@ export async function getAppointmentsByStatus(status: string) {
           updatedAt: appointments.updatedAt,
           customerName: users.firstName,
           customerLastName: users.lastName,
-          barberName: users.firstName,
-          barberLastName: users.lastName,
           serviceName: services.name,
           servicePrice: services.price
         })
@@ -198,8 +196,6 @@ export async function getAppointmentsByStatus(status: string) {
           updatedAt: appointments.updatedAt,
           customerName: users.firstName,
           customerLastName: users.lastName,
-          barberName: users.firstName,
-          barberLastName: users.lastName,
           serviceName: services.name,
           servicePrice: services.price
         })
@@ -210,7 +206,54 @@ export async function getAppointmentsByStatus(status: string) {
         .orderBy(appointments.appointmentDate);
     }
 
-    res.data = appointmentsList;
+    // Now fetch barber names for each appointment
+    const appointmentsWithBarberNames = await Promise.all(
+      appointmentsList.map(async (appointment) => {
+        try {
+          // Fetch barber user info
+          const barberUser = appointment.barberId ? await db
+            .select({
+              firstName: users.firstName,
+              lastName: users.lastName,
+            })
+            .from(users)
+            .where(eq(users.id, appointment.barberId))
+            .limit(1) : [];
+
+          // Fetch customer user info
+          const customerUser = appointment.userId ? await db
+            .select({
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            })
+            .from(users)
+            .where(eq(users.id, appointment.userId))
+            .limit(1) : [];
+
+          return {
+            ...appointment,
+            barberName: barberUser[0]?.firstName || '',
+            barberLastName: barberUser[0]?.lastName || '',
+            customerName: customerUser[0]?.firstName || '',
+            customerLastName: customerUser[0]?.lastName || '',
+            customerEmail: customerUser[0]?.email || '',
+          };
+        } catch (error) {
+          console.error('Error fetching user names for appointment:', appointment.id, error);
+          return {
+            ...appointment,
+            barberName: '',
+            barberLastName: '',
+            customerName: '',
+            customerLastName: '',
+            customerEmail: '',
+          };
+        }
+      })
+    );
+
+    res.data = appointmentsWithBarberNames;
     return res;
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -343,6 +386,7 @@ export async function getBarberAppointments(barberId: string) {
         updatedAt: appointments.updatedAt,
         customerName: users.firstName,
         customerLastName: users.lastName,
+        customerEmail: users.email,
         serviceName: services.name,
         servicePrice: services.price
       })
