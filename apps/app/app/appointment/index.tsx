@@ -661,31 +661,18 @@ export default function AppointmentScreen() {
 
 	// Always render the main screen, handle loading states within the content
 	return (
-		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading}>
-			{/* Header with back button */}
-			<View style={{ 
-				flexDirection: 'row', 
-				alignItems: 'center', 
-				paddingHorizontal: 20, 
-				paddingVertical: 15,
-				borderBottomWidth: 1,
-				borderBottomColor: Colors.dark.gray
-			}}>
-				<Pressable 
-					onPress={() => router.back()}
-					style={{ 
-						padding: 8,
-						marginRight: 15
-					}}
-				>
-					<ThemeText style={{ fontSize: 18 }}>←</ThemeText>
-				</Pressable>
-				<ThemeText style={{ fontSize: 20, fontWeight: 'bold' }}>
-					Agendar Cita
-				</ThemeText>
-			</View>
+		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading} edges={['bottom']}>
+			<Stack.Screen
+				options={{
+					headerShown: true,
+					title: 'Agendar Cita',
+					headerBackTitle: 'Volver',
+					headerStyle: { backgroundColor: Colors.dark.background },
+					headerTintColor: '#fff'
+				}}
+			/>
 			
-			<ScrollView>
+			<ScrollView contentContainerStyle={{ paddingTop: 0 }}>
 				<Container style={{ paddingBottom: 30 }}>
 					{/* Loading State */}
 					{isLoading && (
@@ -730,8 +717,8 @@ export default function AppointmentScreen() {
 					{!isLoading && (services.length > 0 || barbers.length > 0) && (
 						<>
 							{/* Barber Selection */}
-							<View style={{ marginBottom: 30 }}>
-								<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, marginTop: 25 }}>
+							<View style={{ marginBottom: 30, marginTop: 0 }}>
+								<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginVertical: 15}}>
 									Seleccionar Barbero
 								</ThemeText>
 							

@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
 import winstonLogger from '../helpers/logger.js';
 import type { User, UserResponse } from './users.d';
+import { hasBarberSchedules } from '../schedules/schedules.controller.js';
 
 
 export async function getAllUsers(role?: 'customer' | 'staff'): Promise<UserResponse> {
@@ -41,7 +42,27 @@ export async function getAllUsers(role?: 'customer' | 'staff'): Promise<UserResp
             return res;
         }
         
-        res.data = allUsers as User[];
+        // For staff users, filter out those without schedules
+        if (role === 'staff') {
+            const barbersWithSchedules = [];
+            
+            for (const user of allUsers) {
+                const hasSchedules = await hasBarberSchedules(user.id);
+                if (hasSchedules) {
+                    barbersWithSchedules.push(user);
+                }
+            }
+            
+            if (barbersWithSchedules.length === 0) {
+                res.error = 'No hay barberos con horarios disponibles en el sistema';
+                return res;
+            }
+            
+            res.data = barbersWithSchedules as User[];
+        } else {
+            res.data = allUsers as User[];
+        }
+        
         return res;
     } catch (error) {
         console.error('Error fetching users:', error);

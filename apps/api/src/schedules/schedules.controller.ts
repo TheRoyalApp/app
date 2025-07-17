@@ -108,6 +108,24 @@ export async function getBarberSchedules(barberId: string) {
   }
 }
 
+// Check if a barber has any schedules
+export async function hasBarberSchedules(barberId: string): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+
+    const barberSchedules = await db
+      .select()
+      .from(schedules)
+      .where(eq(schedules.barberId, barberId))
+      .limit(1);
+
+    return barberSchedules.length > 0;
+  } catch (error) {
+    console.error('Error checking barber schedules:', error);
+    return false;
+  }
+}
+
 // Get availability for a specific date
 export async function getAvailability(barberId: string, date: string) {
   const res = {
