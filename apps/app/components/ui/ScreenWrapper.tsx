@@ -12,6 +12,7 @@ interface ScreenWrapperProps {
   style?: any;
   showTopFade?: boolean;
   showBottomFade?: boolean;
+  isLoading?: boolean;
 }
 
 export default function ScreenWrapper({
@@ -20,7 +21,8 @@ export default function ScreenWrapper({
   statusBarStyle = 'light-content',
   style,
   showTopFade = true,
-  showBottomFade = true
+  showBottomFade = true,
+  isLoading = false
 }: ScreenWrapperProps) {
   const getMaskColors = () => {
     if (showTopFade && showBottomFade) {

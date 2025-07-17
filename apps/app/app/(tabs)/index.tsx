@@ -1,7 +1,7 @@
 // React Native core imports
 import React from 'react';
 import { View, ScrollView, Alert, RefreshControl } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 // Third-party library imports
 import { Link, router, useFocusEffect } from 'expo-router';
@@ -21,18 +21,40 @@ export default function HomeScreen() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [response, setResponse] = useState<any>(null);
+	const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
 
 	if (__DEV__) {
-		console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading);
+		console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading, 'HasAttemptedFetch:', hasAttemptedFetch);
 	}
+
+	// Effect to handle initial load and user state changes
+	useEffect(() => {
+		if (user && !hasAttemptedFetch) {
+			if (__DEV__) {
+				console.log('🎯 User available, attempting initial fetch');
+			}
+			fetchUpcomingAppointment();
+			setHasAttemptedFetch(true);
+		} else if (!user && hasAttemptedFetch) {
+			// Reset state when user becomes unavailable
+			setUpcomingAppointment(null);
+			setHasAttemptedFetch(false);
+			setIsLoading(false);
+		}
+	}, [user, hasAttemptedFetch]);
 
 	useFocusEffect(
 		useCallback(() => {
 			if (__DEV__) {
-				console.log('🎯 useFocusEffect triggered - calling fetchUpcomingAppointment');
+				console.log('🎯 useFocusEffect triggered - user:', user?.name || 'No user');
 			}
-			fetchUpcomingAppointment();
-		}, [])
+			
+			// Only fetch if user is available and we haven't attempted yet
+			if (user && !hasAttemptedFetch) {
+				fetchUpcomingAppointment();
+				setHasAttemptedFetch(true);
+			}
+		}, [user, hasAttemptedFetch])
 	);
 
 	const fetchUpcomingAppointment = async () => {
@@ -193,7 +215,7 @@ export default function HomeScreen() {
 	};
 
 	return (
-		<ScreenWrapper showBottomFade={true} showTopFade={false}>
+		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading}>
 			<ScrollView
 				refreshControl={
 					<RefreshControl

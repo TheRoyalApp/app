@@ -46,15 +46,35 @@ export default function AppointmentScreen() {
 	const [isBooking, setIsBooking] = useState(false);
 	const [selectedServiceName, setSelectedServiceName] = useState<string | null>(null);
 	const [barberError, setBarberError] = useState<string | null>(null);
+	const [servicesError, setServicesError] = useState<string | null>(null);
 	const [isMounted, setIsMounted] = useState(true);
 	const [alertShown, setAlertShown] = useState(false); // Local flag to prevent duplicate alerts
 	const [paymentCancelled, setPaymentCancelled] = useState(false); // Track if payment was cancelled
+	const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
 
 	
 	useEffect(() => {
-		loadInitialData();
 		setIsMounted(true);
 	}, []);
+
+	// Effect to handle initial load and user state changes
+	useEffect(() => {
+		if (user && !hasAttemptedLoad) {
+			if (__DEV__) {
+				console.log('🎯 User available for appointment screen, loading initial data');
+			}
+			loadInitialData();
+			setHasAttemptedLoad(true);
+		} else if (!user && hasAttemptedLoad) {
+			// Reset state when user becomes unavailable
+			setServices([]);
+			setBarbers([]);
+			setSelectedService(null);
+			setSelectedBarber(null);
+			setHasAttemptedLoad(false);
+			setIsLoading(false);
+		}
+	}, [user, hasAttemptedLoad]);
 
 	// Note: Deep link handling has been moved to the global layout
 	// This ensures payment callbacks work from anywhere in the app
@@ -63,18 +83,32 @@ export default function AppointmentScreen() {
 		try {
 			setIsLoading(true);
 			
-			// Add timeout to prevent infinite loading
-			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => reject(new Error('Loading timeout')), 10000);
+			console.log('🚀 Starting initial data load...');
+			
+			// Load services and barbers in parallel, but don't fail if one fails
+			const results = await Promise.allSettled([
+				loadServices(),
+				loadBarbers()
+			]);
+			
+			console.log('📊 Initial data load results:', {
+				services: results[0].status,
+				barbers: results[1].status
 			});
 			
-			await Promise.race([
-				Promise.allSettled([loadServices(), loadBarbers()]),
-				timeoutPromise
-			]);
+			// Check if we have at least some data
+			const hasServices = services.length > 0;
+			const hasBarbers = barbers.length > 0;
+			
+			console.log('📈 Data availability:', {
+				hasServices,
+				hasBarbers,
+				servicesCount: services.length,
+				barbersCount: barbers.length
+			});
+			
 		} catch (error) {
 			console.error('Error loading initial data:', error);
-			// Don't show alert, just set loading to false
 		} finally {
 			setIsLoading(false);
 		}
@@ -82,10 +116,22 @@ export default function AppointmentScreen() {
 
 	const retryLoadServices = async () => {
 		try {
+			console.log('🔄 Retrying services load...');
 			setServices([]); // Clear existing services
+			setServicesError(null); // Clear any previous errors
+			
+			// Test network connectivity first
+			const isConnected = await testNetworkConnectivity();
+			if (!isConnected) {
+				console.log('❌ Network connectivity test failed for services retry');
+				setServicesError('No se puede conectar al servidor. Verifica tu conexión a internet.');
+				return;
+			}
+			
 			await loadServices();
 		} catch (error) {
-			console.error('Error retrying services load:', error);
+			console.error('❌ Error retrying services load:', error);
+			setServicesError('Error al cargar servicios. Por favor, intenta nuevamente.');
 		}
 	};
 
@@ -109,14 +155,41 @@ export default function AppointmentScreen() {
 		}
 	};
 
+	const retryLoadAll = async () => {
+		try {
+			setHasAttemptedLoad(false); // Reset the flag to allow retry
+			setServices([]);
+			setBarbers([]);
+			setSelectedService(null);
+			setSelectedBarber(null);
+			setServicesError(null); // Clear services error
+			setBarberError(null); // Clear barber error
+			setIsLoading(true);
+			await loadInitialData();
+		} catch (error) {
+			console.error('Error retrying all data load:', error);
+		}
+	};
+
 	const loadServices = async () => {
 		try {
 			// Reset services and error state
 			setServices([]);
+			setServicesError(null);
 			
-			// Use a faster request without retry logic for better UX
+			console.log('🔄 Loading services from:', `${API_CONFIG.baseURL}/services`);
+			
+			// Test network connectivity first
+			const isConnected = await testNetworkConnectivity();
+			if (!isConnected) {
+				console.log('❌ Network connectivity test failed for services');
+				setServicesError('No se puede conectar al servidor. Verifica tu conexión a internet.');
+				return; // Don't throw error, just return and let UI handle it
+			}
+			
+			// Use a longer timeout for services request
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased to 8 seconds
 			
 			try {
 				const response = await fetch(`${API_CONFIG.baseURL}/services`, {
@@ -130,40 +203,70 @@ export default function AppointmentScreen() {
 				
 				clearTimeout(timeoutId);
 				
+				console.log('📡 Services API Response Status:', response.status);
+				
 				if (!response.ok) {
 					let errorMessage = `HTTP ${response.status}`;
 					try {
 						const errorData = await response.json();
 						errorMessage = errorData.message || errorData.error || errorMessage;
+						console.log('❌ Services API Error Response:', errorData);
 					} catch (parseError) {
 						// If we can't parse the error response, use the status text
 						errorMessage = response.statusText || errorMessage;
+						console.log('❌ Services API Parse Error:', parseError);
 					}
 					throw new Error(errorMessage);
 				}
 				
 				const data = await response.json();
+				console.log('✅ Services API Success Response:', data);
 				
 				if (data.success && data.data) {
+					console.log('🎯 Services loaded:', data.data.length);
 					setServices(data.data);
 				} else {
 					console.error('Failed to load services:', data.error);
-					// Don't show alert here, let the fallback UI handle it
+					setServicesError('No se pudieron cargar los servicios. Por favor, intenta nuevamente.');
 				}
 			} catch (fetchError) {
 				clearTimeout(timeoutId);
+				console.log('❌ Fetch error in loadServices:', fetchError);
 				throw fetchError;
 			}
 		} catch (error) {
 			console.error('Error loading services:', error);
-			// Don't show alert here, let the fallback UI handle it
-			// Log the full error for debugging
+			
+			// Log detailed error information for debugging
 			if (error instanceof Error) {
-				console.log('Services error details:', {
+				console.log('🔍 Services error details:', {
 					name: error.name,
 					message: error.message,
 					stack: error.stack
 				});
+				
+				// Handle specific error types and set appropriate error messages
+				if (error.name === 'AbortError') {
+					console.log('⏰ Services request timed out');
+					setServicesError('Tiempo de espera agotado. Por favor, intenta nuevamente.');
+				} else if (error.message.includes('Network') || error.message.includes('fetch')) {
+					console.log('🌐 Services network error');
+					setServicesError('Error de conexión. Por favor, verifica tu internet e intenta nuevamente.');
+				} else if (error.message.includes('404') || error.message.includes('not found')) {
+					console.log('🔍 Services endpoint not found');
+					setServicesError('No hay servicios disponibles en el sistema. Por favor, contacta al administrador.');
+				} else if (error.message.includes('500') || error.message.includes('server')) {
+					console.log('💥 Services server error');
+					setServicesError('Error del servidor. Por favor, intenta más tarde.');
+				} else {
+					// Limit error message length to prevent truncation
+					const errorMsg = error.message.length > 50 ? 
+						error.message.substring(0, 50) + '...' : 
+						error.message;
+					setServicesError(`Error al cargar servicios: ${errorMsg}`);
+				}
+			} else {
+				setServicesError('Error de conexión. Por favor, verifica tu internet e intenta nuevamente.');
 			}
 		}
 	};
@@ -556,109 +659,9 @@ export default function AppointmentScreen() {
 		}).format(numericPrice);
 	};
 
-	if (isLoading) {
-		return (
-			<ScreenWrapper>
-				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-					<ActivityIndicator size="large" color={Colors.dark.primary} />
-					<ThemeText style={{ marginTop: 10 }}>Loading services...</ThemeText>
-				</View>
-			</ScreenWrapper>
-		);
-	}
-
-	// Show fallback when no data is available
-	if (services.length === 0 && barbers.length === 0) {
-		return (
-			<ScreenWrapper>
-				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
-						No hay datos disponibles
-					</ThemeText>
-					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
-						No se pudieron cargar los servicios o barberos. Esto puede deberse a:
-					</ThemeText>
-					<View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
-						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-							• Problemas de conexión a internet
-						</ThemeText>
-						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-							• Servicios temporalmente no disponibles
-						</ThemeText>
-						<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-							• No hay barberos activos en el sistema
-						</ThemeText>
-					</View>
-					<Button onPress={() => loadInitialData()} style={{ marginBottom: 10 }}>
-						Reintentar
-					</Button>
-					<Button secondary onPress={() => router.back()}>
-						Volver
-					</Button>
-				</View>
-			</ScreenWrapper>
-		);
-	}
-
-	// Show specific error when only services are missing
-	if (services.length === 0 && barbers.length > 0) {
-		return (
-			<ScreenWrapper>
-				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
-						No hay servicios disponibles
-					</ThemeText>
-					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
-						No se pudieron cargar los servicios. Por favor, contacta al administrador o intenta más tarde.
-					</ThemeText>
-					<Button onPress={() => retryLoadServices()} style={{ marginBottom: 10 }}>
-						Reintentar
-					</Button>
-					<Button secondary onPress={() => router.back()}>
-						Volver
-					</Button>
-				</View>
-			</ScreenWrapper>
-		);
-	}
-
-	// Show specific error when only barbers are missing
-	if (barbers.length === 0 && services.length > 0) {
-		return (
-			<ScreenWrapper>
-				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-					<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
-						No hay barberos disponibles
-					</ThemeText>
-					<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
-						{barberError || 'No hay barberos activos en el sistema. Esto puede deberse a:'}
-					</ThemeText>
-					{!barberError && (
-						<View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
-							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-								• No hay barberos registrados en el sistema
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-								• Los barberos no están activos
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
-								• Problemas de configuración del sistema
-							</ThemeText>
-						</View>
-					)}
-					<Button onPress={() => retryLoadBarbers()} style={{ marginBottom: 10 }} disabled={isLoadingBarbers}>
-						{isLoadingBarbers ? 'Cargando...' : 'Reintentar'}
-					</Button>
-					<Button secondary onPress={() => router.back()}>
-						Volver
-					</Button>
-				</View>
-			</ScreenWrapper>
-		);
-	}
-
+	// Always render the main screen, handle loading states within the content
 	return (
-		<ScreenWrapper showBottomFade={true} showTopFade={false}>
+		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading}>
 			{/* Header with back button */}
 			<View style={{ 
 				flexDirection: 'row', 
@@ -684,342 +687,430 @@ export default function AppointmentScreen() {
 			
 			<ScrollView>
 				<Container style={{ paddingBottom: 30 }}>
-					{/* Remove the duplicate title since we now have a header */}
-					{/* <ThemeText style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
-						Agendar Cita
-					</ThemeText> */}
-
-					{/* Barber Selection */}
-					<View style={{ marginBottom: 30 }}>
-						<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
-							Seleccionar Barbero
-						</ThemeText>
-						{/* Debug info */}
-						<ThemeText style={{ fontSize: 12, color: Colors.dark.textLight, marginBottom: 10 }}>
-							Debug: {barbers.length} barbers loaded, Selected: {selectedBarber?.name || 'None'}
-						</ThemeText>
-						
-						{barbers.length === 0 ? (
-							<View style={{ 
-								padding: 20, 
-								backgroundColor: Colors.dark.gray, 
-								borderRadius: 10,
-								alignItems: 'center'
-							}}>
-								{isLoadingBarbers ? (
-									<>
-										<ActivityIndicator size="small" color={Colors.dark.primary} style={{ marginBottom: 10 }} />
-										<ThemeText style={{ 
-											textAlign: 'center', 
-											color: Colors.dark.textLight,
-											marginBottom: 5
-										}}>
-											Cargando barberos...
-										</ThemeText>
-									</>
-								) : (
-									<>
-										<ThemeText style={{ 
-											textAlign: 'center', 
-											color: Colors.dark.textLight,
-											marginBottom: 5
-										}}>
-											{barberError || 'No hay barberos disponibles'}
-										</ThemeText>
-										<ThemeText style={{ 
-											textAlign: 'center', 
-											color: Colors.dark.textLight,
-											fontSize: 12,
-											marginBottom: 10
-										}}>
-											Por favor contacta al administrador
-										</ThemeText>
-										<Button 
-											onPress={() => retryLoadBarbers()} 
-											style={{ marginTop: 5 }}
-											secondary
-											disabled={isLoadingBarbers}
-										>
-											{isLoadingBarbers ? 'Cargando...' : 'Reintentar'}
-										</Button>
-									</>
-								)}
-							</View>
-						) : (
-							<ScrollView 
-								horizontal 
-								showsHorizontalScrollIndicator={false}
-								contentContainerStyle={{ paddingHorizontal: 5 }}
-							>
-								{barbers.map((barber, index) => (
-									<Pressable
-										key={barber.id}
-										onPress={() => {
-											setSelectedBarber(barber);
-											// Reset date and time when barber changes
-											setSelectedDate('');
-											setSelectedTime('');
-										}}
-										style={{
-											width: 120,
-											marginRight: index === barbers.length - 1 ? 0 : 15,
-											padding: 15,
-											backgroundColor: selectedBarber?.id === barber.id ? Colors.dark.primary : Colors.dark.background,
-											borderColor: selectedBarber?.id === barber.id ? Colors.dark.primary : Colors.dark.gray,
-											borderWidth: 1,
-											borderRadius: 10,
-											alignItems: 'center'
-										}}
-									>
-										<View style={{
-											width: 50,
-											height: 50,
-											borderRadius: 25,
-											backgroundColor: selectedBarber?.id === barber.id ? 'rgba(255,255,255,0.2)' : Colors.dark.gray,
-											justifyContent: 'center',
-											alignItems: 'center',
-											marginBottom: 8
-										}}>
-											<ThemeText style={{ 
-												fontSize: 18, 
-												fontWeight: 'bold',
-												color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
-											}}>
-												{barber.firstName.charAt(0)}{barber.lastName.charAt(0)}
-											</ThemeText>
-										</View>
-										<ThemeText style={{ 
-											fontSize: 12, 
-											fontWeight: '600',
-											textAlign: 'center',
-											color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
-										}}>
-											{barber.firstName}
-										</ThemeText>
-										<ThemeText style={{ 
-											fontSize: 12, 
-											textAlign: 'center',
-											color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
-										}}>
-											{barber.lastName}
-										</ThemeText>
-									</Pressable>
-								))}
-							</ScrollView>
-						)}
-					</View>
-
-					{/* Services Section - Fixed Height Vertical Scroll */}
-					<View style={{ marginBottom: 30 }}>
-						<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
-							Seleccionar Servicio
-						</ThemeText>
-						<ScrollView 
-							showsVerticalScrollIndicator={false}
-							style={{ 
-								height: 220, // Fixed height to maintain layout
-								borderRadius: 10,
-								backgroundColor: 'rgba(255, 255, 255, 0.05)'
-							}}
-							contentContainerStyle={{ 
-								padding: 10,
-								gap: 12 
-							}}
-						>
-							{services.map((service) => (
-								<ServiceCard
-									key={service.id}
-									title={service.name}
-									price={service.price}
-									description={service.description || ''}
-									selected={[selectedServiceName, (serviceName) => {
-										setSelectedServiceName(serviceName);
-										if (serviceName) {
-											const foundService = services.find(s => s.name === serviceName);
-											setSelectedService(foundService || null);
-										} else {
-											setSelectedService(null);
-										}
-									}]}
-								/>
-							))}
-						</ScrollView>
-					</View>
-
-					{/* Payment Type Selection */}
-					{selectedService && (
-						<View style={{ marginBottom: 30 }}>
-							<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
-								Tipo de Pago
-							</ThemeText>
-							<View style={{ flexDirection: 'row', gap: 15 }}>
-								<Pressable
-									onPress={() => setPaymentType('full')}
-									style={{
-										flex: 1,
-										padding: 15,
-										backgroundColor: paymentType === 'full' ? Colors.dark.primary : Colors.dark.background,
-										borderColor: paymentType === 'full' ? Colors.dark.primary : Colors.dark.gray,
-										borderWidth: 1,
-										borderRadius: 10,
-										alignItems: 'center'
-									}}
-								>
-									<ThemeText style={{ 
-										fontSize: 16, 
-										fontWeight: '600',
-										color: paymentType === 'full' ? Colors.dark.background : Colors.dark.text,
-										marginBottom: 5
-									}}>
-										Pago Completo
-									</ThemeText>
-									<ThemeText style={{ 
-										fontSize: 14,
-										color: paymentType === 'full' ? Colors.dark.background : Colors.dark.textLight
-									}}>
-										{formatPrice(selectedService.price)}
-									</ThemeText>
-								</Pressable>
-								
-								<Pressable
-									onPress={() => setPaymentType('advance')}
-									style={{
-										flex: 1,
-										padding: 15,
-										backgroundColor: paymentType === 'advance' ? Colors.dark.primary : Colors.dark.background,
-										borderColor: paymentType === 'advance' ? Colors.dark.primary : Colors.dark.gray,
-										borderWidth: 1,
-										borderRadius: 10,
-										alignItems: 'center'
-									}}
-								>
-									<ThemeText style={{ 
-										fontSize: 16, 
-										fontWeight: '600',
-										color: paymentType === 'advance' ? Colors.dark.background : Colors.dark.text,
-										marginBottom: 5
-									}}>
-										Anticipo (50%)
-									</ThemeText>
-									<ThemeText style={{ 
-										fontSize: 14,
-										color: paymentType === 'advance' ? Colors.dark.background : Colors.dark.textLight
-									}}>
-										{formatPrice(parseFloat(selectedService.price) * 0.5)}
-									</ThemeText>
-								</Pressable>
-							</View>
-							<ThemeText style={{ 
-								fontSize: 12, 
-								color: Colors.dark.textLight,
-								textAlign: 'center',
-								marginTop: 10
-							}}>
-								{paymentType === 'advance' 
-									? 'Pagarás el resto del servicio en la barbería'
-									: 'Pago completo del servicio'
-								}
+					{/* Loading State */}
+					{isLoading && (
+						<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 }}>
+							<ActivityIndicator size="large" color={Colors.dark.primary} />
+							<ThemeText style={{ marginTop: 10, textAlign: 'center' }}>
+								Cargando servicios y barberos...
 							</ThemeText>
 						</View>
 					)}
 
-					{/* Date and Time Selection */}
-					<View style={{ marginBottom: 30 }}>
-						{selectedBarber && (
-							<AppointmentDatePicker
-								barberId={selectedBarber.id}
-								onDateSelect={setSelectedDate}
-								onTimeSelect={setSelectedTime}
-								showConfirmButton={false}
-								showSummary={false}
-								title="Seleccionar Fecha y Hora"
-								subtitle="Elige la fecha y hora de tu cita"
-							/>
-						)}
-						{!selectedBarber && (
-							<View style={{ padding: 15, backgroundColor: Colors.dark.gray, borderRadius: 10 }}>
-								<ThemeText style={{ textAlign: 'center', color: Colors.dark.textLight }}>
-									Por favor selecciona un barbero primero
+					{/* Error State - No Data */}
+					{!isLoading && services.length === 0 && barbers.length === 0 && (
+						<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+							<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+								No hay datos disponibles
+							</ThemeText>
+							<ThemeText style={{ marginBottom: 20, textAlign: 'center', color: Colors.dark.textLight }}>
+								No se pudieron cargar los servicios o barberos. Esto puede deberse a:
+							</ThemeText>
+							<View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+								<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+									• Problemas de conexión a internet
+								</ThemeText>
+								<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+									• Servicios temporalmente no disponibles
+								</ThemeText>
+								<ThemeText style={{ marginBottom: 8, color: Colors.dark.textLight, fontSize: 14 }}>
+									• No hay barberos activos en el sistema
 								</ThemeText>
 							</View>
-						)}
-					</View>
+							<Button onPress={() => retryLoadAll()} style={{ marginBottom: 10 }}>
+								Reintentar
+							</Button>
+							<Button secondary onPress={() => router.back()}>
+								Volver
+							</Button>
+						</View>
+					)}
 
-					{/* Booking Summary */}
-					{selectedBarber && selectedService && selectedDate && selectedTime && (
-						<View style={{ marginBottom: 30, padding: 15, backgroundColor: Colors.dark.gray, borderRadius: 10 }}>
-							<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-								Resumen de la Cita
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5 }}>
-								Barbero: {selectedBarber.name}
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5 }}>
-								Servicio: {selectedService.name}
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5 }}>
-								Precio del servicio: {formatPrice(selectedService.price)}
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5, fontWeight: '600', color: Colors.dark.primary }}>
-								Monto a pagar: {paymentType === 'full' 
-									? formatPrice(selectedService.price)
-									: formatPrice(parseFloat(selectedService.price) * 0.5)
-								} ({paymentType === 'full' ? 'Pago completo' : 'Anticipo 50%'})
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5 }}>
-								Duración: {selectedService.duration} minutos
-							</ThemeText>
-							<ThemeText style={{ marginBottom: 5 }}>
-								Fecha: {new Date(selectedDate).toLocaleDateString('es-ES')}
-							</ThemeText>
-							<ThemeText>
-								Hora: {formatTime(selectedTime)}
-							</ThemeText>
-							{paymentType === 'advance' && (
-								<View style={{ 
-									marginTop: 10, 
-									padding: 10, 
-									backgroundColor: 'rgba(255, 193, 7, 0.1)', 
-									borderRadius: 5,
-									borderLeftWidth: 3,
-									borderLeftColor: '#ffc107'
-								}}>
-									<ThemeText style={{ fontSize: 12, color: '#ffc107', fontWeight: '500' }}>
-										💡 Recordatorio: Pagarás el resto ({formatPrice(parseFloat(selectedService.price) * 0.5)}) en la barbería
+					{/* Main Content - Only show when not loading and we have some data */}
+					{!isLoading && (services.length > 0 || barbers.length > 0) && (
+						<>
+							{/* Barber Selection */}
+							<View style={{ marginBottom: 30 }}>
+								<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, marginTop: 25 }}>
+									Seleccionar Barbero
+								</ThemeText>
+							
+								{barbers.length === 0 ? (
+									<View style={{ 
+										padding: 20, 
+										backgroundColor: Colors.dark.gray, 
+										borderRadius: 10,
+										alignItems: 'center'
+									}}>
+										{isLoadingBarbers ? (
+											<>
+												<ActivityIndicator size="small" color={Colors.dark.primary} style={{ marginBottom: 10 }} />
+												<ThemeText style={{ 
+													textAlign: 'center', 
+													color: Colors.dark.textLight,
+													marginBottom: 5
+												}}>
+													Cargando barberos...
+												</ThemeText>
+											</>
+										) : (
+											<>
+												<ThemeText style={{ 
+													textAlign: 'center', 
+													color: Colors.dark.textLight,
+													marginBottom: 5
+												}}>
+													{barberError || 'No hay barberos disponibles'}
+												</ThemeText>
+												<ThemeText style={{ 
+													textAlign: 'center', 
+													color: Colors.dark.textLight,
+													fontSize: 12,
+													marginBottom: 10
+												}}>
+													Por favor contacta al administrador
+												</ThemeText>
+												<Button 
+													onPress={() => retryLoadBarbers()} 
+													style={{ marginTop: 5 }}
+													secondary
+													disabled={isLoadingBarbers}
+												>
+													{isLoadingBarbers ? 'Cargando...' : 'Reintentar'}
+												</Button>
+											</>
+										)}
+									</View>
+								) : (
+									<ScrollView 
+										horizontal 
+										showsHorizontalScrollIndicator={false}
+										contentContainerStyle={{ paddingHorizontal: 5 }}
+									>
+										{barbers.map((barber, index) => (
+											<Pressable
+												key={barber.id}
+												onPress={() => {
+													setSelectedBarber(barber);
+													// Reset date and time when barber changes
+													setSelectedDate('');
+													setSelectedTime('');
+												}}
+												style={{
+													width: 120,
+													marginRight: index === barbers.length - 1 ? 0 : 15,
+													padding: 15,
+													backgroundColor: selectedBarber?.id === barber.id ? Colors.dark.primary : Colors.dark.background,
+													borderColor: selectedBarber?.id === barber.id ? Colors.dark.primary : Colors.dark.gray,
+													borderWidth: 1,
+													borderRadius: 10,
+													alignItems: 'center'
+												}}
+											>
+												<View style={{
+													width: 50,
+													height: 50,
+													borderRadius: 25,
+													backgroundColor: selectedBarber?.id === barber.id ? 'rgba(255,255,255,0.2)' : Colors.dark.gray,
+													justifyContent: 'center',
+													alignItems: 'center',
+													marginBottom: 8
+												}}>
+													<ThemeText style={{ 
+														fontSize: 18, 
+														fontWeight: 'bold',
+														color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
+													}}>
+														{barber.firstName.charAt(0)}{barber.lastName.charAt(0)}
+													</ThemeText>
+												</View>
+												<ThemeText style={{ 
+													fontSize: 12, 
+													fontWeight: '600',
+													textAlign: 'center',
+													color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
+												}}>
+													{barber.firstName}
+												</ThemeText>
+												<ThemeText style={{ 
+													fontSize: 12, 
+													textAlign: 'center',
+													color: selectedBarber?.id === barber.id ? Colors.dark.background : Colors.dark.text
+												}}>
+													{barber.lastName}
+												</ThemeText>
+											</Pressable>
+										))}
+									</ScrollView>
+								)}
+							</View>
+
+							{/* Services Section - Fixed Height Vertical Scroll */}
+							<View style={{ marginBottom: 30 }}>
+								<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
+									Seleccionar Servicio
+								</ThemeText>
+								<ScrollView 
+									showsVerticalScrollIndicator={false}
+									style={{ 
+										height: 220, // Fixed height to maintain layout
+										borderRadius: 10,
+										backgroundColor: 'rgba(255, 255, 255, 0.05)'
+									}}
+									contentContainerStyle={{ 
+										padding: 10,
+										gap: 12 
+									}}
+								>
+									{services.length === 0 ? (
+										<View style={{ 
+											padding: 20, 
+											backgroundColor: Colors.dark.gray, 
+											borderRadius: 10,
+											alignItems: 'center'
+										}}>
+											{servicesError ? (
+												<>
+													<ThemeText style={{ 
+														textAlign: 'center', 
+														color: Colors.dark.textLight,
+														marginBottom: 5
+													}}>
+														{servicesError}
+													</ThemeText>
+													<ThemeText style={{ 
+														textAlign: 'center', 
+														color: Colors.dark.textLight,
+														fontSize: 12,
+														marginBottom: 10
+													}}>
+														Por favor contacta al administrador
+													</ThemeText>
+													<Button 
+														onPress={() => retryLoadServices()} 
+														style={{ marginTop: 5 }}
+														secondary
+													>
+														Reintentar
+													</Button>
+												</>
+											) : (
+												<>
+													<ThemeText style={{ 
+														textAlign: 'center', 
+														color: Colors.dark.textLight,
+														marginBottom: 5
+													}}>
+														No hay servicios disponibles
+													</ThemeText>
+													<Button 
+														onPress={() => retryLoadServices()} 
+														style={{ marginTop: 5 }}
+														secondary
+													>
+														Reintentar
+													</Button>
+												</>
+											)}
+										</View>
+									) : (
+										services.map((service) => (
+											<ServiceCard
+												key={service.id}
+												title={service.name}
+												price={service.price}
+												description={service.description || ''}
+												selected={[selectedServiceName, (serviceName) => {
+													setSelectedServiceName(serviceName);
+													if (serviceName) {
+														const foundService = services.find(s => s.name === serviceName);
+														setSelectedService(foundService || null);
+													} else {
+														setSelectedService(null);
+													}
+												}]}
+											/>
+										))
+									)}
+								</ScrollView>
+							</View>
+
+							{/* Payment Type Selection */}
+							{selectedService && (
+								<View style={{ marginBottom: 30 }}>
+									<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
+										Tipo de Pago
+									</ThemeText>
+									<View style={{ flexDirection: 'row', gap: 15 }}>
+										<Pressable
+											onPress={() => setPaymentType('full')}
+											style={{
+												flex: 1,
+												padding: 15,
+												backgroundColor: paymentType === 'full' ? Colors.dark.primary : Colors.dark.background,
+												borderColor: paymentType === 'full' ? Colors.dark.primary : Colors.dark.gray,
+												borderWidth: 1,
+												borderRadius: 10,
+												alignItems: 'center'
+											}}
+										>
+											<ThemeText style={{ 
+												fontSize: 16, 
+												fontWeight: '600',
+												color: paymentType === 'full' ? Colors.dark.background : Colors.dark.text,
+												marginBottom: 5
+											}}>
+												Pago Completo
+											</ThemeText>
+											<ThemeText style={{ 
+												fontSize: 14,
+												color: paymentType === 'full' ? Colors.dark.background : Colors.dark.textLight
+											}}>
+												{formatPrice(selectedService.price)}
+											</ThemeText>
+										</Pressable>
+										
+										<Pressable
+											onPress={() => setPaymentType('advance')}
+											style={{
+												flex: 1,
+												padding: 15,
+												backgroundColor: paymentType === 'advance' ? Colors.dark.primary : Colors.dark.background,
+												borderColor: paymentType === 'advance' ? Colors.dark.primary : Colors.dark.gray,
+												borderWidth: 1,
+												borderRadius: 10,
+												alignItems: 'center'
+											}}
+										>
+											<ThemeText style={{ 
+												fontSize: 16, 
+												fontWeight: '600',
+												color: paymentType === 'advance' ? Colors.dark.background : Colors.dark.text,
+												marginBottom: 5
+											}}>
+												Anticipo (50%)
+											</ThemeText>
+											<ThemeText style={{ 
+												fontSize: 14,
+												color: paymentType === 'advance' ? Colors.dark.background : Colors.dark.textLight
+											}}>
+												{formatPrice(parseFloat(selectedService.price) * 0.5)}
+											</ThemeText>
+										</Pressable>
+									</View>
+									<ThemeText style={{ 
+										fontSize: 12, 
+										color: Colors.dark.textLight,
+										textAlign: 'center',
+										marginTop: 10
+									}}>
+										{paymentType === 'advance' 
+											? 'Pagarás el resto del servicio en la barbería'
+											: 'Pago completo del servicio'
+										}
 									</ThemeText>
 								</View>
 							)}
-						</View>
+
+							{/* Date and Time Selection */}
+							<View style={{ marginBottom: 30 }}>
+								{selectedBarber && (
+									<AppointmentDatePicker
+										barberId={selectedBarber.id}
+										onDateSelect={setSelectedDate}
+										onTimeSelect={setSelectedTime}
+										showConfirmButton={false}
+										showSummary={false}
+										title="Seleccionar Fecha y Hora"
+										subtitle="Elige la fecha y hora de tu cita"
+									/>
+								)}
+								{!selectedBarber && (
+									<View style={{ padding: 15, backgroundColor: Colors.dark.gray, borderRadius: 10 }}>
+										<ThemeText style={{ textAlign: 'center', color: Colors.dark.textLight }}>
+											Por favor selecciona un barbero primero
+										</ThemeText>
+									</View>
+								)}
+							</View>
+
+							{/* Booking Summary */}
+							{selectedBarber && selectedService && selectedDate && selectedTime && (
+								<View style={{ marginBottom: 30, padding: 15, backgroundColor: Colors.dark.gray, borderRadius: 10 }}>
+									<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+										Resumen de la Cita
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5 }}>
+										Barbero: {selectedBarber.name}
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5 }}>
+										Servicio: {selectedService.name}
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5 }}>
+										Precio del servicio: {formatPrice(selectedService.price)}
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5, fontWeight: '600', color: Colors.dark.primary }}>
+										Monto a pagar: {paymentType === 'full' 
+											? formatPrice(selectedService.price)
+											: formatPrice(parseFloat(selectedService.price) * 0.5)
+										} ({paymentType === 'full' ? 'Pago completo' : 'Anticipo 50%'})
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5 }}>
+										Duración: {selectedService.duration} minutos
+									</ThemeText>
+									<ThemeText style={{ marginBottom: 5 }}>
+										Fecha: {new Date(selectedDate).toLocaleDateString('es-ES')}
+									</ThemeText>
+									<ThemeText>
+										Hora: {formatTime(selectedTime)}
+									</ThemeText>
+									{paymentType === 'advance' && (
+										<View style={{ 
+											marginTop: 10, 
+											padding: 10, 
+											backgroundColor: 'rgba(255, 193, 7, 0.1)', 
+											borderRadius: 5,
+											borderLeftWidth: 3,
+											borderLeftColor: '#ffc107'
+										}}>
+											<ThemeText style={{ fontSize: 12, color: '#ffc107', fontWeight: '500' }}>
+												💡 Recordatorio: Pagarás el resto ({formatPrice(parseFloat(selectedService.price) * 0.5)}) en la barbería
+											</ThemeText>
+										</View>
+									)}
+								</View>
+							)}
+
+							{/* Payment Info */}
+							{selectedBarber && selectedService && selectedDate && selectedTime && (
+								<View style={{ 
+									marginBottom: 20, 
+									padding: 12, 
+									backgroundColor: 'rgba(75, 181, 67, 0.1)', 
+									borderRadius: 8,
+									borderLeftWidth: 3,
+									borderLeftColor: '#4bb543'
+								}}>
+									<ThemeText style={{ fontSize: 12, color: '#4bb543', fontWeight: '500' }}>
+										🔒 Pago seguro con Stripe • Tu cita se confirmará automáticamente
+									</ThemeText>
+								</View>
+							)}
+
+							{/* Book Button */}
+							<Button
+								onPress={handleBooking}
+								disabled={!selectedBarber || !selectedService || !selectedDate || !selectedTime || isBooking}
+								style={{ marginBottom: 20 }}
+							>
+								{isBooking ? 'Creando sesión de pago...' : '💳 Pagar y Reservar'}
+							</Button>
+
+							<Button secondary onPress={() => router.back()}>
+								Cancelar
+							</Button>
+						</>
 					)}
-
-					{/* Payment Info */}
-					{selectedBarber && selectedService && selectedDate && selectedTime && (
-						<View style={{ 
-							marginBottom: 20, 
-							padding: 12, 
-							backgroundColor: 'rgba(75, 181, 67, 0.1)', 
-							borderRadius: 8,
-							borderLeftWidth: 3,
-							borderLeftColor: '#4bb543'
-						}}>
-							<ThemeText style={{ fontSize: 12, color: '#4bb543', fontWeight: '500' }}>
-								🔒 Pago seguro con Stripe • Tu cita se confirmará automáticamente
-							</ThemeText>
-						</View>
-					)}
-
-					{/* Book Button */}
-					<Button
-						onPress={handleBooking}
-						disabled={!selectedBarber || !selectedService || !selectedDate || !selectedTime || isBooking}
-						style={{ marginBottom: 20 }}
-					>
-						{isBooking ? 'Creando sesión de pago...' : '💳 Pagar y Reservar'}
-					</Button>
-
-					<Button secondary onPress={() => router.back()}>
-						Cancelar
-					</Button>
 				</Container>
 			</ScrollView>
 		</ScreenWrapper>

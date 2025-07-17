@@ -64,7 +64,7 @@ function RootLayoutNav() {
 				console.log('Auth check taking too long, showing fallback auth screens');
 				setShowFallback(true);
 			}
-		}, 5000); // 5 second timeout
+		}, 8000); // Increased to 8 second timeout
 		
 		return () => clearTimeout(timer);
 	}, [isLoading]);

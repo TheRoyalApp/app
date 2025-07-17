@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsFirstTime(true);
         setUser(null);
       }
-    }, 3000); // 3 second backup
+    }, 8000); // Increased to 8 second backup
 
     return () => clearTimeout(backupTimer);
   }, [isLoading]);
@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Add a timeout to prevent getting stuck
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Auth check timeout')), 10000); // 10 second timeout
+        setTimeout(() => reject(new Error('Auth check timeout')), 5000); // Reduced to 5 second timeout
       });
       
       const authCheckPromise = async () => {

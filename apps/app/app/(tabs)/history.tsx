@@ -32,7 +32,7 @@ export default function HistoryScreen() {
 		try {
 			setIsLoading(true);
 			const response = await AppointmentsService.getUserAppointments();
-			
+
 			if (response.success && response.data) {
 				setAppointments(response.data);
 			} else {
@@ -53,12 +53,12 @@ export default function HistoryScreen() {
 	};
 
 	const handleReschedule = (appointment: Appointment) => {
-		console.log('🔍 HISTORY RESCHEDULE DEBUG:', { 
+		console.log('🔍 HISTORY RESCHEDULE DEBUG:', {
 			appointmentId: appointment.id,
 			appointmentUserId: appointment.userId,
 			currentUserId: user?.id,
 			appointment,
-			user 
+			user
 		});
 		router.push(`/appointment/reschedule/${appointment.id}` as any);
 	};
@@ -78,7 +78,7 @@ export default function HistoryScreen() {
 					onPress: async () => {
 						try {
 							const response = await AppointmentsService.cancelAppointment(appointmentId);
-							
+
 							if (response.success) {
 								Alert.alert('Éxito', 'Cita cancelada exitosamente');
 								// Reload appointments to reflect the change
@@ -108,6 +108,7 @@ export default function HistoryScreen() {
 	}
 
 	return (
+
 		<SafeAreaView style={{ flex: 1, backgroundColor: Colors.dark.background }}>
 			<StatusBar barStyle="light-content" />
 			<ScrollView
@@ -115,8 +116,8 @@ export default function HistoryScreen() {
 				contentContainerStyle={{ paddingHorizontal: 20 }}
 				showsVerticalScrollIndicator={false}
 				refreshControl={
-					<RefreshControl 
-						refreshing={refreshing} 
+					<RefreshControl
+						refreshing={refreshing}
 						onRefresh={onRefresh}
 						tintColor={Colors.dark.primary}
 						colors={[Colors.dark.primary]}
@@ -128,7 +129,7 @@ export default function HistoryScreen() {
 						Historial
 					</ThemeText>
 				</View>
-				
+
 				<View style={{ gap: 12, paddingBottom: 20 }}>
 					{appointments.length === 0 ? (
 						<View style={{ alignItems: 'center', paddingVertical: 40 }}>
