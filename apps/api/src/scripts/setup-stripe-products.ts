@@ -6,6 +6,9 @@
  * and updates the services with the Stripe IDs.
  */
 
+import * as dotenv from 'dotenv';
+dotenv.config({ path: './apps/api/.env' });
+
 import Stripe from 'stripe';
 import { getDatabase } from '../db/connection.js';
 import { services } from '../db/schema.js';

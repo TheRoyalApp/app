@@ -82,14 +82,21 @@ function RootLayoutNav() {
 			console.log('👤 Current user state:', user ? 'Authenticated' : 'Not authenticated');
 			console.log('⏳ Loading state:', isLoading ? 'Loading' : 'Ready');
 			
-			// Clear any pending payment callback timeout
-			if (paymentCallbackTimeout) {
-				clearTimeout(paymentCallbackTimeout);
-				paymentCallbackTimeout = null;
+			// Only clear payment callback timeout if this is a payment-related deep link
+			if (url.includes('app://payment/') || url.includes('app://payment-callback')) {
+				// Clear any pending payment callback timeout
+				if (paymentCallbackTimeout) {
+					clearTimeout(paymentCallbackTimeout);
+					paymentCallbackTimeout = null;
+				}
+				// Clear local timeout if it exists
+				if ((global as any).clearLocalPaymentTimeout) {
+					(global as any).clearLocalPaymentTimeout();
+				}
+				paymentCallbackExpected = false;
+				alertShown = false; // Reset alert flag when payment deep link is received
+				paymentCancelled = false; // Reset payment cancelled flag when payment deep link is received
 			}
-			paymentCallbackExpected = false;
-			alertShown = false; // Reset alert flag when deep link is received
-			paymentCancelled = false; // Reset payment cancelled flag when deep link is received
 			
 			// Handle payment success URLs
 			if (url.includes('app://payment/success')) {
@@ -440,7 +447,7 @@ function RootLayoutNav() {
 						]
 					);
 				}
-			}, 10000); // 10 second timeout
+			}, 8000); // Reduced to 8 seconds for faster fallback
 		};
 
 		// Expose the function globally for the appointment screen to use

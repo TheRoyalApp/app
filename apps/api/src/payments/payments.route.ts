@@ -499,11 +499,14 @@ paymentsRoute.post('/webhook', async (c) => {
               });
             }
 
+            // Log paymentType for debugging
+            console.log('Webhook paymentType:', paymentType);
             // Create payment record
             const paymentData = {
               appointmentId,
               amount: (session.amount_total || 0).toString(), // Convert to string for decimal
               paymentMethod: 'stripe',
+              paymentType: paymentType || 'full', // Fallback to 'full' if missing
               status: 'completed',
               transactionId: session.id
             };
@@ -538,12 +541,9 @@ paymentsRoute.post('/webhook', async (c) => {
     return c.json(successResponse(200, { received: true }), 200);
   } catch (error) {
     console.error('❌ Error processing webhook:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      eventType: event?.type
-    });
-    
+    if (error instanceof Error) {
+      console.error('Stack trace:', error.stack);
+    }
     // Return error response so Stripe knows to retry
     return c.json(errorResponse(500, 'Webhook processing failed'), 500);
   }
@@ -581,6 +581,7 @@ paymentsRoute.post('/test-webhook', async (c) => {
       const [payment] = await tx.insert(payments).values({
         amount: (amount || 2500).toString(),
         paymentMethod: 'stripe',
+        paymentType: paymentType, // Store the payment type
         status: 'completed',
         transactionId: sessionId,
       }).returning();

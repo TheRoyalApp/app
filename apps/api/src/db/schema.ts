@@ -70,6 +70,7 @@ export const payments = pgTable('payments', {
   appointmentId: uuid('appointment_id').references(() => appointments.id),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   paymentMethod: text('payment_method').notNull(), // cash, card, etc.
+  paymentType: text('payment_type'), // 'full' or 'advance'
   status: text('status').default('pending'), // pending, completed, failed
   transactionId: text('transaction_id'),
   createdAt: timestamp('created_at').defaultNow(),

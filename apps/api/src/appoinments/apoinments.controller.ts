@@ -175,11 +175,14 @@ export async function getAppointmentsByStatus(status: string) {
           customerName: users.firstName,
           customerLastName: users.lastName,
           serviceName: services.name,
-          servicePrice: services.price
+          servicePrice: services.price,
+          paymentAmount: payments.amount,
+          paymentType: payments.paymentType
         })
         .from(appointments)
         .leftJoin(users, eq(appointments.userId, users.id))
         .leftJoin(services, eq(appointments.serviceId, services.id))
+        .leftJoin(payments, eq(appointments.id, payments.appointmentId))
         .orderBy(appointments.appointmentDate);
     } else {
       appointmentsList = await db
@@ -197,11 +200,14 @@ export async function getAppointmentsByStatus(status: string) {
           customerName: users.firstName,
           customerLastName: users.lastName,
           serviceName: services.name,
-          servicePrice: services.price
+          servicePrice: services.price,
+          paymentAmount: payments.amount,
+          paymentType: payments.paymentType
         })
         .from(appointments)
         .leftJoin(users, eq(appointments.userId, users.id))
         .leftJoin(services, eq(appointments.serviceId, services.id))
+        .leftJoin(payments, eq(appointments.id, payments.appointmentId))
         .where(eq(appointments.status, status))
         .orderBy(appointments.appointmentDate);
     }

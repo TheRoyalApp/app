@@ -805,6 +805,26 @@ const AdminPanel = () => {
                   <ThemeText style={styles.cardPrice}>{a.serviceName || appointment.service?.name || appointment.serviceId}</ThemeText>
                   <ThemeText style={styles.cardDescription}>{formatDate(appointment.appointmentDate)} - {appointment.timeSlot}</ThemeText>
                   <ThemeText style={styles.cardDescription}>{a.customerEmail || appointment.user?.email || ''}</ThemeText>
+                  
+                  {/* Payment Information */}
+                  {a.paymentAmount && (
+                    <View style={styles.paymentContainer}>
+                      <ThemeText style={styles.paymentLabel}>💰 PAGO:</ThemeText>
+                      <ThemeText style={styles.paymentAmount}>
+                        ${parseFloat(a.paymentAmount).toFixed(2)}
+                      </ThemeText>
+                      {a.paymentType && (
+                        <View style={[
+                          styles.paymentTypeBadge,
+                          { backgroundColor: a.paymentType === 'full' ? '#28a745' : '#ffc107' }
+                        ]}>
+                          <ThemeText style={styles.paymentTypeText}>
+                            {a.paymentType === 'full' ? 'PAGO COMPLETO' : 'ANTICIPO'}
+                          </ThemeText>
+                        </View>
+                      )}
+                    </View>
+                  )}
                   {user?.isAdmin && a.barberName && (
                     <View style={styles.barberContainer}>
                       <ThemeText style={styles.barberLabel}>👨‍💼 BARBERO:</ThemeText>
@@ -2021,6 +2041,34 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontWeight: '600',
     fontSize: 14,
+  },
+  paymentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    gap: 8,
+  },
+  paymentLabel: {
+    fontSize: 14,
+    color: Colors.dark.textLight,
+    fontWeight: '600',
+  },
+  paymentAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.dark.text,
+  },
+  paymentTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  paymentTypeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: Colors.dark.background,
+    textAlign: 'center',
   },
 });
 

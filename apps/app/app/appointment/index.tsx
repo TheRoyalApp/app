@@ -428,6 +428,38 @@ export default function AppointmentScreen() {
 				(global as any).expectPaymentCallback();
 			}
 			
+			// Set up a local timeout as backup in case the global timeout doesn't work
+			let localTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+				console.log('🔄 Local timeout triggered - payment flow may have completed');
+				if (!alertShown && !paymentCancelled) {
+					setAlertShown(true);
+					WebBrowser.dismissBrowser();
+					Alert.alert(
+						'¡Pago Procesado!',
+						'Tu pago ha sido procesado. Si el pago fue exitoso, tu cita ha sido confirmada. Revisa tu historial para confirmar.',
+						[
+							{ 
+								text: 'Ver Historial', 
+								onPress: () => router.replace('/(tabs)/history') 
+							},
+							{ 
+								text: 'OK', 
+								onPress: () => router.replace('/(tabs)') 
+							}
+						]
+					);
+				}
+			}, 12000); // 12 second local timeout
+			
+			// Expose the local timeout clear function globally
+			(global as any).clearLocalPaymentTimeout = () => {
+				if (localTimeout) {
+					clearTimeout(localTimeout);
+					localTimeout = null;
+					console.log('🔄 Local payment timeout cleared');
+				}
+			};
+			
 			const response = await PaymentsService.createCheckoutSession(checkoutData);
 			
 			if (response.success && response.data) {
@@ -456,6 +488,11 @@ export default function AppointmentScreen() {
 					// Clear payment callback expectation since user cancelled
 					if ((global as any).clearPaymentCallback) {
 						(global as any).clearPaymentCallback();
+					}
+					
+					// Clear local timeout since payment was cancelled
+					if ((global as any).clearLocalPaymentTimeout) {
+						(global as any).clearLocalPaymentTimeout();
 					}
 					
 					const appointmentDate = formattedDate;
@@ -529,7 +566,43 @@ export default function AppointmentScreen() {
 								);
 							}
 						}
-					}, 2000);
+					}, 1500); // Reduced wait time for faster response
+				} else {
+					// Handle any other browser result types (like Safari errors)
+					console.log('Browser returned unexpected result type:', result.type);
+					
+					// Wait a moment for any pending deep link events
+					setTimeout(() => {
+						// If no deep link was received, show a success message
+						console.log('No deep link received after unexpected browser result - showing success message');
+						
+						// Only show success message if payment wasn't cancelled
+						if (!paymentCancelled) {
+							// Check if we have a global failure handler
+							if ((global as any).handleEmbeddedBrowserFailure && !alertShown) {
+								setAlertShown(true);
+								(global as any).handleEmbeddedBrowserFailure();
+							} else if (!alertShown) {
+								// Fallback to local alert
+								setAlertShown(true);
+								WebBrowser.dismissBrowser();
+								Alert.alert(
+									'¡Pago Procesado!',
+									'Tu pago ha sido procesado. Si el pago fue exitoso, tu cita ha sido confirmada. Revisa tu historial para confirmar.',
+									[
+										{ 
+											text: 'Ver Historial', 
+											onPress: () => router.replace('/(tabs)/history') 
+										},
+										{ 
+											text: 'OK', 
+											onPress: () => router.replace('/(tabs)') 
+										}
+									]
+								);
+							}
+						}
+					}, 1500);
 				}
 			} else {
 				Alert.alert('Error', response.error || 'Failed to create payment session');
@@ -551,6 +624,15 @@ export default function AppointmentScreen() {
 			setIsBooking(false);
 		}
 	};
+	
+	// Cleanup function to clear timeouts when component unmounts
+	React.useEffect(() => {
+		return () => {
+			if ((global as any).clearLocalPaymentTimeout) {
+				(global as any).clearLocalPaymentTimeout();
+			}
+		};
+	}, []);
 
 	const formatTime = (time: string) => {
 		const [hours, minutes] = time.split(':');
