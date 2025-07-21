@@ -1,0 +1,33 @@
+{
+  "name": "the-royal-barber-website",
+  "version": "1.0.0",
+  "description": "Official website for The Royal Barber app",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -p $PORT",
+    "dev": "serve -s . -p 3000",
+    "build": "echo 'Static site - no build required'",
+    "test": "echo 'No tests specified'"
+  },
+  "keywords": [
+    "barber",
+    "barbershop",
+    "the-royal-barber",
+    "website"
+  ],
+  "author": "The Royal Barber",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
