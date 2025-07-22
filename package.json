@@ -17,7 +17,13 @@
     "seed:users": "pnpm --filter api seed:users",
     "seed:services": "pnpm --filter api seed:services",
     "seed:schedules": "pnpm --filter api seed:schedules",
-    "seed:all": "pnpm --filter api seed:all"
+    "seed:all": "pnpm --filter api seed:all",
+    "start": "cd apps/api && bun run src/index.ts",
+    "build": "echo 'Monorepo build - individual services handle their own builds'",
+    "install:all": "pnpm install && cd apps/api && pnpm install && cd ../website && pnpm install",
+    "deploy:api": "cd apps/api && railway up",
+    "deploy:website": "cd apps/website && railway up",
+    "deploy:all": "npm run deploy:api && npm run deploy:website"
   },
   "keywords": [],
   "author": "",
@@ -34,5 +40,8 @@
     "@react-native-picker/picker": "^2.11.1",
     "pg": "^8.11.3",
     "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
