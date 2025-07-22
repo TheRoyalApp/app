@@ -20,6 +20,7 @@ export default function RescheduleScreen() {
     const [selectedTime, setSelectedTime] = useState<string>("");
     const [isRescheduling, setIsRescheduling] = useState(false);
     const [appointment, setAppointment] = useState<Appointment | null>(null);
+    const [allUserAppointments, setAllUserAppointments] = useState<Appointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [apiReady, setApiReady] = useState(false);
@@ -50,7 +51,15 @@ export default function RescheduleScreen() {
         console.log('AppointmentId:', appointmentId);
         console.log('========================');
         loadAppointment();
+        loadAllUserAppointments();
     }, [appointmentId, apiReady, authLoading, user]);
+
+    // Check if this is the closest appointment and redirect if not
+    useEffect(() => {
+        if (appointment && allUserAppointments.length > 0) {
+            checkAndRedirectIfNotClosest();
+        }
+    }, [appointment, allUserAppointments]);
 
     const loadAppointment = async () => {
         try {
@@ -77,6 +86,60 @@ export default function RescheduleScreen() {
         }
     };
 
+    const checkAndRedirectIfNotClosest = () => {
+        if (appointment && allUserAppointments.length > 0) {
+            const closestAppointment = getClosestUpcomingAppointment();
+            if (closestAppointment && closestAppointment.id !== appointment.id) {
+                Alert.alert(
+                    "Cita no disponible",
+                    "Solo puedes reprogramar tu próxima cita programada. Serás redirigido a tu próxima cita.",
+                    [
+                        {
+                            text: "OK",
+                            onPress: () => {
+                                router.replace(`/appointment/reschedule/${closestAppointment.id}`);
+                            }
+                        }
+                    ]
+                );
+            }
+        }
+    };
+
+    const loadAllUserAppointments = async () => {
+        try {
+            const response = await AppointmentsService.getUserAppointments();
+            if (response.success && response.data) {
+                setAllUserAppointments(response.data);
+            }
+        } catch (error) {
+            console.error('Error loading user appointments:', error);
+        }
+    };
+
+    const getClosestUpcomingAppointment = (): Appointment | null => {
+        const now = new Date();
+        const upcomingAppointments = allUserAppointments.filter(apt => {
+            const aptDate = new Date(apt.appointmentDate);
+            return aptDate > now && (apt.status === 'confirmed' || apt.status === 'pending');
+        });
+
+        if (upcomingAppointments.length === 0) return null;
+
+        // Sort by appointment date and time, then return the closest one
+        return upcomingAppointments.sort((a, b) => {
+            const dateA = new Date(a.appointmentDate);
+            const dateB = new Date(b.appointmentDate);
+            return dateA.getTime() - dateB.getTime();
+        })[0];
+    };
+
+    const isClosestAppointment = (): boolean => {
+        if (!appointment) return false;
+        const closestAppointment = getClosestUpcomingAppointment();
+        return closestAppointment?.id === appointment.id;
+    };
+
     const formatDate = (dateString: string) => {
         if (!dateString) return "";
         let date: Date;
@@ -86,21 +149,20 @@ export default function RescheduleScreen() {
         } else {
             date = new Date(dateString);
         }
-        return date.toLocaleDateString("es-ES", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        });
+        // Format as dd/mm/yyyy
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
     };
 
     const formatTime = (timeString: string) => {
         if (!timeString) return "";
-        const [hour] = timeString.split(':');
+        const [hour, minute = '00'] = timeString.split(':');
         const hourNum = parseInt(hour);
-        const period = hourNum >= 12 ? "PM" : "AM";
-        const displayHour = hourNum > 12 ? hourNum - 12 : hourNum;
-        return `${displayHour}:00 ${period}`;
+        const minuteNum = parseInt(minute);
+        // Format as hh:mm
+        return `${hourNum.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')}`;
     };
 
     const isWithin30Minutes = () => {
@@ -120,17 +182,34 @@ export default function RescheduleScreen() {
         // Check if appointment is within 30 minutes
         const isWithin30Min = isWithin30Minutes();
         
-        return canRescheduleStatus && canRescheduleCount && !isWithin30Min;
+        // Check if this is the closest upcoming appointment
+        const isClosest = isClosestAppointment();
+        
+        return canRescheduleStatus && canRescheduleCount && !isWithin30Min && isClosest;
     };
 
     const handleReschedule = () => {
         if (!appointment) return;
         if (!canReschedule()) {
-            Alert.alert(
-                "No se puede reprogramar",
-                "Esta cita ya ha sido reprogramada el máximo de veces permitido o no está en un estado válido para reprogramar.",
-                [{ text: "OK" }]
-            );
+            if (!isClosestAppointment()) {
+                Alert.alert(
+                    "No se puede reprogramar",
+                    "Solo puedes reprogramar tu próxima cita programada. Esta cita no es tu próxima cita.",
+                    [{ text: "OK" }]
+                );
+            } else if (isWithin30Minutes()) {
+                Alert.alert(
+                    "No se puede reprogramar",
+                    "No se puede reprogramar una cita 30 minutos antes de la hora programada.",
+                    [{ text: "OK" }]
+                );
+            } else {
+                Alert.alert(
+                    "No se puede reprogramar",
+                    "Esta cita ya ha sido reprogramada el máximo de veces permitido o no está en un estado válido para reprogramar.",
+                    [{ text: "OK" }]
+                );
+            }
             return;
         }
         setIsRescheduling(true);
@@ -320,6 +399,8 @@ export default function RescheduleScreen() {
                                     ? "✅ Puedes reprogramar esta cita"
                                     : isWithin30Minutes()
                                     ? "⏰ No se puede reprogramar (menos de 30 minutos)"
+                                    : !isClosestAppointment()
+                                    ? "📅 Solo puedes reprogramar tu próxima cita"
                                     : "❌ Esta cita ya no puede ser reprogramada"
                                 }
                             </ThemeText>
@@ -336,6 +417,11 @@ export default function RescheduleScreen() {
                             {isWithin30Minutes() && (
                                 <ThemeText style={{ ...styles.statusSubtext, color: '#FF6B6B', fontWeight: 'bold' }}>
                                     ⚠️ Restricción: No se puede reprogramar 30 minutos antes de la cita
+                                </ThemeText>
+                            )}
+                            {!isClosestAppointment() && appointment && (
+                                <ThemeText style={{ ...styles.statusSubtext, color: '#FFA500', fontWeight: 'bold' }}>
+                                    ℹ️ Solo puedes reprogramar tu próxima cita programada
                                 </ThemeText>
                             )}
                         </View>

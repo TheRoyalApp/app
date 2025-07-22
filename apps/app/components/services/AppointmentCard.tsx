@@ -10,9 +10,10 @@ interface AppointmentCardProps {
 	onCancel?: (appointmentId: string) => void;
 	onReschedule?: (appointment: Appointment) => void;
 	onPress?: (appointment: Appointment) => void;
+	isClosestAppointment?: boolean;
 }
 
-export default function AppointmentCard({ appointment, onCancel, onReschedule, onPress }: AppointmentCardProps) {
+export default function AppointmentCard({ appointment, onCancel, onReschedule, onPress, isClosestAppointment }: AppointmentCardProps) {
 	const formatTime = (timeSlot: string) => {
 		const [hours, minutes] = timeSlot.split(':');
 		const hour = parseInt(hours);
@@ -96,7 +97,7 @@ export default function AppointmentCard({ appointment, onCancel, onReschedule, o
 	const isWithin30Minutes = timeDifferenceMinutes <= 30;
 	
 	const canReschedule = (appointment.status === 'confirmed' || appointment.status === 'pending') && 
-		        (appointment.rescheduleCount || 0) < 1 && !isWithin30Minutes;
+		        (appointment.rescheduleCount || 0) < 1 && !isWithin30Minutes && (isClosestAppointment ?? true);
 
 	return (
 		<Pressable

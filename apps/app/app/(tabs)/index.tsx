@@ -158,7 +158,9 @@ export default function HomeScreen() {
 		const validStatus = appointment.status === 'confirmed' || appointment.status === 'pending';
 		const validRescheduleCount = (appointment.rescheduleCount || 0) < 1;
 		const notWithin30Minutes = !isWithin30Minutes(appointment);
-		return validStatus && validRescheduleCount && notWithin30Minutes;
+		// Since this is the upcoming appointment from the API, it should be the closest one
+		const isClosest = true; // The upcomingAppointment is already the closest one
+		return validStatus && validRescheduleCount && notWithin30Minutes && isClosest;
 	};
 
 	return (

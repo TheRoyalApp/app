@@ -51,6 +51,23 @@ export default function HistoryScreen() {
 		setRefreshing(false);
 	};
 
+	const getClosestUpcomingAppointment = (): Appointment | null => {
+		const now = new Date();
+		const upcomingAppointments = appointments.filter(apt => {
+			const aptDate = new Date(apt.appointmentDate);
+			return aptDate > now && (apt.status === 'confirmed' || apt.status === 'pending');
+		});
+
+		if (upcomingAppointments.length === 0) return null;
+
+		// Sort by appointment date and time, then return the closest one
+		return upcomingAppointments.sort((a, b) => {
+			const dateA = new Date(a.appointmentDate);
+			const dateB = new Date(b.appointmentDate);
+			return dateA.getTime() - dateB.getTime();
+		})[0];
+	};
+
 	const handleReschedule = (appointment: Appointment) => {
 		router.push(`/appointment/reschedule/${appointment.id}` as any);
 	};
@@ -144,13 +161,18 @@ export default function HistoryScreen() {
 									</ThemeText>
 									{appointments
 										.filter(appointment => appointment.status === 'confirmed' || appointment.status === 'pending')
-										.map(appointment => (
-											<AppointmentCard
-												key={appointment.id}
-												appointment={appointment}
-												onReschedule={handleReschedule}
-											/>
-										))}
+										.map(appointment => {
+											const closestAppointment = getClosestUpcomingAppointment();
+											const isClosest = closestAppointment?.id === appointment.id;
+											return (
+												<AppointmentCard
+													key={appointment.id}
+													appointment={appointment}
+													onReschedule={handleReschedule}
+													isClosestAppointment={isClosest}
+												/>
+											);
+										})}
 								</View>
 							)}
 
