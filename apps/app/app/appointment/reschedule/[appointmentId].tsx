@@ -103,11 +103,24 @@ export default function RescheduleScreen() {
         return `${displayHour}:00 ${period}`;
     };
 
+    const isWithin30Minutes = () => {
+        if (!appointment) return false;
+        const appointmentDateTime = new Date(appointment.appointmentDate);
+        const currentTime = new Date();
+        const timeDifferenceMs = appointmentDateTime.getTime() - currentTime.getTime();
+        const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
+        return timeDifferenceMinutes <= 30;
+    };
+
     const canReschedule = () => {
         if (!appointment) return false;
         const canRescheduleStatus = appointment.status === 'confirmed' || appointment.status === 'pending';
         const canRescheduleCount = (appointment.rescheduleCount || 0) < 1;
-        return canRescheduleStatus && canRescheduleCount;
+        
+        // Check if appointment is within 30 minutes
+        const isWithin30Min = isWithin30Minutes();
+        
+        return canRescheduleStatus && canRescheduleCount && !isWithin30Min;
     };
 
     const handleReschedule = () => {
@@ -305,6 +318,8 @@ export default function RescheduleScreen() {
                             <ThemeText style={styles.statusText}>
                                 {canReschedule()
                                     ? "✅ Puedes reprogramar esta cita"
+                                    : isWithin30Minutes()
+                                    ? "⏰ No se puede reprogramar (menos de 30 minutos)"
                                     : "❌ Esta cita ya no puede ser reprogramada"
                                 }
                             </ThemeText>
@@ -318,6 +333,11 @@ export default function RescheduleScreen() {
                                             appointment.status === 'cancelled' ? 'Cancelada' :
                                                 appointment.status}
                             </ThemeText>
+                            {isWithin30Minutes() && (
+                                <ThemeText style={{ ...styles.statusSubtext, color: '#FF6B6B', fontWeight: 'bold' }}>
+                                    ⚠️ Restricción: No se puede reprogramar 30 minutos antes de la cita
+                                </ThemeText>
+                            )}
                         </View>
                     </View>
                     {/* Reschedule Button */}

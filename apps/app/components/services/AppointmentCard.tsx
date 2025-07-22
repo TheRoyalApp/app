@@ -87,8 +87,16 @@ export default function AppointmentCard({ appointment, onCancel, onReschedule, o
 	};
 
 	const canCancel = appointment.status === 'confirmed' || appointment.status === 'pending';
+	
+	// Check if appointment is within 30 minutes
+	const appointmentDateTime = new Date(appointment.appointmentDate);
+	const currentTime = new Date();
+	const timeDifferenceMs = appointmentDateTime.getTime() - currentTime.getTime();
+	const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
+	const isWithin30Minutes = timeDifferenceMinutes <= 30;
+	
 	const canReschedule = (appointment.status === 'confirmed' || appointment.status === 'pending') && 
-		        (appointment.rescheduleCount || 0) < 1;
+		        (appointment.rescheduleCount || 0) < 1 && !isWithin30Minutes;
 
 	return (
 		<Pressable

@@ -146,6 +146,21 @@ export default function HomeScreen() {
 		}
 	};
 
+	const isWithin30Minutes = (appointment: Appointment) => {
+		const appointmentDateTime = new Date(appointment.appointmentDate);
+		const currentTime = new Date();
+		const timeDifferenceMs = appointmentDateTime.getTime() - currentTime.getTime();
+		const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
+		return timeDifferenceMinutes <= 30;
+	};
+
+	const canRescheduleAppointment = (appointment: Appointment) => {
+		const validStatus = appointment.status === 'confirmed' || appointment.status === 'pending';
+		const validRescheduleCount = (appointment.rescheduleCount || 0) < 1;
+		const notWithin30Minutes = !isWithin30Minutes(appointment);
+		return validStatus && validRescheduleCount && notWithin30Minutes;
+	};
+
 	return (
 		<ScreenWrapper showBottomFade={true} showTopFade={false} isLoading={isLoading}>
 			<ScrollView
@@ -240,9 +255,17 @@ export default function HomeScreen() {
 						</Button>
 						<Button
 							secondary
-							disabled={!upcomingAppointment}
+							disabled={!upcomingAppointment || (upcomingAppointment && !canRescheduleAppointment(upcomingAppointment))}
 							onPress={() => {
 								if (upcomingAppointment) {
+									if (!canRescheduleAppointment(upcomingAppointment)) {
+										if (isWithin30Minutes(upcomingAppointment)) {
+											Alert.alert('No se puede reprogramar', 'No se puede reprogramar una cita 30 minutos antes de la hora programada');
+										} else {
+											Alert.alert('No se puede reprogramar', 'Esta cita ya no puede ser reprogramada');
+										}
+										return;
+									}
 									try {
 										// Add a small delay to show button press feedback
 										setTimeout(() => {
@@ -256,7 +279,14 @@ export default function HomeScreen() {
 								}
 							}}
 						>
-							{upcomingAppointment ? 'Reagendar' : 'Sin citas'}
+							{upcomingAppointment 
+								? (canRescheduleAppointment(upcomingAppointment) 
+									? 'Reagendar' 
+									: isWithin30Minutes(upcomingAppointment) 
+										? 'Muy pronto' 
+										: 'No disponible')
+								: 'Sin citas'
+							}
 						</Button>
 					</View>
 

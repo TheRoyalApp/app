@@ -475,6 +475,17 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       return res;
     }
 
+    // Check if appointment is within 30 minutes (prevent rescheduling)
+    const appointmentDateTime = new Date(existingAppointment[0]?.appointmentDate || '');
+    const currentTime = new Date();
+    const timeDifferenceMs = appointmentDateTime.getTime() - currentTime.getTime();
+    const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
+    
+    if (timeDifferenceMinutes <= 30) {
+      res.error = 'No se puede reprogramar una cita 30 minutos antes de la hora programada';
+      return res;
+    }
+
     // Parse new date
     const targetDate = parseDate(newDate);
     if (!targetDate) {
