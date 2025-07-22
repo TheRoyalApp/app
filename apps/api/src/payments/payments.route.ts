@@ -13,7 +13,7 @@ import {
   getUserPayments 
 } from './payments.controller.js';
 import type { TimeSlot } from '../schedules/schedules.d.js';
-import { sendAppointmentConfirmation } from '../notifications/notifications.controller.js';
+import { sendAppointmentConfirmation, sendBarberNotification } from '../notifications/notifications.controller.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-05-28.basil',
@@ -485,6 +485,19 @@ paymentsRoute.post('/webhook', async (c) => {
                         } catch (notificationError) {
                           console.error('❌ Error sending WhatsApp confirmation:', notificationError);
                         }
+
+                        // Send barber notification for new appointment
+                        console.log('👨‍💼 Sending barber notification for appointment:', appointment.id);
+                        try {
+                          const barberNotificationResult = await sendBarberNotification(appointment.id, tx);
+                          if (barberNotificationResult.success) {
+                            console.log('✅ Barber notification sent successfully');
+                          } else {
+                            console.error('❌ Failed to send barber notification:', barberNotificationResult.error);
+                          }
+                        } catch (barberNotificationError) {
+                          console.error('❌ Error sending barber notification:', barberNotificationError);
+                        }
                       } else {
                         console.error('❌ Failed to create appointment - no appointment returned');
                         throw new Error('Failed to create appointment');
@@ -720,6 +733,19 @@ paymentsRoute.post('/test-webhook', async (c) => {
 
         console.log(`✅ Appointment created successfully with ID: ${appointment.id} and status: confirmed`);
         console.log(`✅ Payment ${payment.id} linked to appointment ${appointment.id}`);
+        
+        // Send barber notification for new appointment
+        console.log('👨‍💼 Sending barber notification for appointment:', appointment.id);
+        try {
+          const barberNotificationResult = await sendBarberNotification(appointment.id, tx);
+          if (barberNotificationResult.success) {
+            console.log('✅ Barber notification sent successfully');
+          } else {
+            console.error('❌ Failed to send barber notification:', barberNotificationResult.error);
+          }
+        } catch (barberNotificationError) {
+          console.error('❌ Error sending barber notification:', barberNotificationError);
+        }
         
         return { payment, appointment };
       } else {

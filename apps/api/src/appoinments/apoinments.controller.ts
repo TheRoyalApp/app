@@ -6,7 +6,7 @@ import type { Appointment, Status } from "./appoinments.d.js";
 import { isTimeSlotAvailable } from "../schedules/schedules.controller.js";
 import type { TimeSlot } from "../schedules/schedules.d.js";
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
-import { sendAppointmentConfirmation } from "../notifications/notifications.controller.js";
+import { sendAppointmentConfirmation, sendBarberNotification } from "../notifications/notifications.controller.js";
 
 // Helper function to convert dd/mm/yyyy to Date object
 function parseDate(dateString: string): Date | null {
@@ -136,6 +136,19 @@ export async function createAppointment(appointmentData: {
     if (!newAppointment[0]) {
       res.error = 'Error al crear la cita. Por favor, intenta nuevamente.';
       return res;
+    }
+    
+    // Send barber notification for new appointment
+    try {
+      const barberNotificationResult = await sendBarberNotification(newAppointment[0].id);
+      if (barberNotificationResult.success) {
+        console.log('✅ Barber notification sent successfully for appointment:', newAppointment[0].id);
+      } else {
+        console.error('❌ Failed to send barber notification:', barberNotificationResult.error);
+      }
+    } catch (barberNotificationError) {
+      console.error('❌ Error sending barber notification:', barberNotificationError);
+      // Don't fail the appointment creation if notification fails
     }
     
     res.data = newAppointment[0] as any;

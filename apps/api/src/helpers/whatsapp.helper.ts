@@ -180,6 +180,39 @@ _WhatsApp: ${phoneNumber}`;
 }
 
 /**
+ * Generate barber notification message for new appointment
+ */
+export function generateBarberNotificationMessage(appointmentData: {
+  customerName: string;
+  customerLastName: string;
+  serviceName: string;
+  appointmentDate: string;
+  timeSlot: string;
+  customerPhone: string;
+  paymentAmount?: string;
+}): string {
+  const { customerName, customerLastName, serviceName, appointmentDate, timeSlot, customerPhone, paymentAmount } = appointmentData;
+  
+  const formattedDateTime = formatAppointmentDateTime(appointmentDate, timeSlot);
+  const customerFullName = `${customerName} ${customerLastName}`.trim();
+  const paymentInfo = paymentAmount ? `💰 *Pago:* $${paymentAmount} MXN` : '';
+  
+  return `🎉 *Nueva Cita Reservada*
+
+¡Hola! Se ha reservado una nueva cita.
+
+👤 *Cliente:* ${customerFullName}
+📞 *Teléfono:* ${customerPhone}
+✂️ *Servicio:* ${serviceName}
+📅 *Fecha y Hora:* ${formattedDateTime}
+${paymentInfo}
+
+¡Prepárate para dar un excelente servicio! ✂️✨
+
+_The Royal Barber_`;
+}
+
+/**
  * Test function to verify WhatsApp integration
  */
 export async function testWhatsAppConnection(): Promise<{
