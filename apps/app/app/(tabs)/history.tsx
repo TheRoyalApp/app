@@ -51,21 +51,39 @@ export default function HistoryScreen() {
 		setRefreshing(false);
 	};
 
-	const getClosestUpcomingAppointment = (): Appointment | null => {
+	const getUpcomingAppointments = (): Appointment[] => {
 		const now = new Date();
 		const upcomingAppointments = appointments.filter(apt => {
 			const aptDate = new Date(apt.appointmentDate);
 			return aptDate > now && (apt.status === 'confirmed' || apt.status === 'pending');
 		});
 
-		if (upcomingAppointments.length === 0) return null;
-
-		// Sort by appointment date and time, then return the closest one
+		// Sort upcoming appointments from nearest to furthest (ascending order)
 		return upcomingAppointments.sort((a, b) => {
 			const dateA = new Date(a.appointmentDate);
 			const dateB = new Date(b.appointmentDate);
 			return dateA.getTime() - dateB.getTime();
-		})[0];
+		});
+	};
+
+	const getPastAppointments = (): Appointment[] => {
+		const now = new Date();
+		const pastAppointments = appointments.filter(apt => {
+			const aptDate = new Date(apt.appointmentDate);
+			return aptDate <= now || (apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'no-show');
+		});
+
+		// Sort past appointments from most recent to oldest (descending order)
+		return pastAppointments.sort((a, b) => {
+			const dateA = new Date(a.appointmentDate);
+			const dateB = new Date(b.appointmentDate);
+			return dateB.getTime() - dateA.getTime();
+		});
+	};
+
+	const getClosestUpcomingAppointment = (): Appointment | null => {
+		const upcomingAppointments = getUpcomingAppointments();
+		return upcomingAppointments.length > 0 ? upcomingAppointments[0] : null;
 	};
 
 	const handleReschedule = (appointment: Appointment) => {
@@ -154,43 +172,39 @@ export default function HistoryScreen() {
 					) : (
 						<View>
 							{/* Upcoming Appointments */}
-							{appointments.filter(a => a.status === 'confirmed' || a.status === 'pending').length > 0 && (
+							{getUpcomingAppointments().length > 0 && (
 								<View style={{ marginBottom: 30 }}>
 									<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
 										Próximas Citas
 									</ThemeText>
-									{appointments
-										.filter(appointment => appointment.status === 'confirmed' || appointment.status === 'pending')
-										.map(appointment => {
-											const closestAppointment = getClosestUpcomingAppointment();
-											const isClosest = closestAppointment?.id === appointment.id;
-											return (
-												<AppointmentCard
-													key={appointment.id}
-													appointment={appointment}
-													onReschedule={handleReschedule}
-													isClosestAppointment={isClosest}
-												/>
-											);
-										})}
-								</View>
-							)}
-
-							{/* Past Appointments */}
-							{appointments.filter(a => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no-show').length > 0 && (
-								<View>
-									<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
-										Historial
-									</ThemeText>
-									{appointments
-										.filter(appointment => appointment.status === 'completed' || appointment.status === 'cancelled' || appointment.status === 'no-show')
-										.map(appointment => (
+									{getUpcomingAppointments().map((appointment: Appointment) => {
+										const closestAppointment = getClosestUpcomingAppointment();
+										const isClosest = closestAppointment?.id === appointment.id;
+										return (
 											<AppointmentCard
 												key={appointment.id}
 												appointment={appointment}
 												onReschedule={handleReschedule}
+												isClosestAppointment={isClosest}
 											/>
-										))}
+										);
+									})}
+								</View>
+							)}
+
+							{/* Past Appointments */}
+							{getPastAppointments().length > 0 && (
+								<View>
+									<ThemeText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>
+										Historial
+									</ThemeText>
+									{getPastAppointments().map((appointment: Appointment) => (
+										<AppointmentCard
+											key={appointment.id}
+											appointment={appointment}
+											onReschedule={handleReschedule}
+										/>
+									))}
 								</View>
 							)}
 						</View>
