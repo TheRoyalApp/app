@@ -62,6 +62,37 @@ notificationsRoute.post('/test-message', async (c) => {
   }
 });
 
+// Test confirmation message format
+notificationsRoute.post('/test-confirmation-format', async (c) => {
+  try {
+    // Test the confirmation message with sample data
+    const testMessage = `¡Hola Test Customer! 🎉
+
+Tu cita ha sido confirmada exitosamente.
+
+📅 *Detalles de tu cita:*
+• Servicio: Classic Haircut
+• Fecha y Hora: 25 de enero de 2025 a las 10:00 AM
+• Barber: Carlos Rodriguez
+
+📍 *Ubicación:* The Royal Barber
+
+⏰ Te recordaremos 15 minutos antes de tu cita.
+
+¡Gracias por elegirnos! ✂️✨
+
+_The Royal Barber_
+_WhatsApp: +1234567890`;
+
+    return c.json(successResponse(200, {
+      message: 'Confirmation message format test',
+      testMessage: testMessage
+    }));
+  } catch (error) {
+    return c.json(errorResponse(500, 'Internal server error', error), 500);
+  }
+});
+
 // Send confirmation message for a specific appointment
 notificationsRoute.post('/confirm/:appointmentId', async (c) => {
   try {
@@ -158,7 +189,7 @@ notificationsRoute.post('/barber/:appointmentId', async (c) => {
 });
 
 // Test barber notification with mock data
-notificationsRoute.post('/barber/test', async (c) => {
+notificationsRoute.post('/barber-test', async (c) => {
   try {
     const db = await getDatabase();
     
@@ -253,6 +284,76 @@ _The Royal Barber_`;
         message: 'Barber notification test completed successfully',
         messageId: result.messageId,
         testMessage: testMessage
+      }));
+    } else {
+      return c.json(errorResponse(400, 'Failed to send barber notification', result.error), 400);
+    }
+  } catch (error) {
+    return c.json(errorResponse(500, 'Internal server error', error), 500);
+  }
+});
+
+// Test barber notification with no payment amount (should use service price)
+notificationsRoute.post('/barber-test-no-payment', async (c) => {
+  try {
+    const db = await getDatabase();
+    
+    // Create test service first
+    const testService = await db.insert(services).values({
+      name: 'Premium Haircut',
+      description: 'Test service without payment',
+      price: '35.00',
+      duration: 45,
+      isActive: true
+    }).returning().catch(() => []); // Ignore if service already exists
+
+    // Create test user (customer)
+    const testUser = await db.insert(users).values({
+      email: 'test2@example.com',
+      password: 'test',
+      firstName: 'Test',
+      lastName: 'Customer2',
+      phone: '+1234567890'
+    }).returning().catch(() => []); // Ignore if user already exists
+
+    // Create test barber
+    const testBarber = await db.insert(users).values({
+      email: 'barber2@example.com',
+      password: 'test',
+      firstName: 'Miguel',
+      lastName: 'Garcia',
+      phone: '+1234567890',
+      role: 'staff'
+    }).returning().catch(() => []); // Ignore if barber already exists
+
+    // Get the created IDs
+    const userId = testUser[0]?.id || '00000000-0000-0000-0000-000000000004';
+    const barberId = testBarber[0]?.id || '00000000-0000-0000-0000-000000000005';
+    const serviceId = testService[0]?.id || '00000000-0000-0000-0000-000000000006';
+
+    // Create a test appointment WITHOUT payment (to test fallback to service price)
+    const testAppointment = await db.insert(appointments).values({
+      userId: userId,
+      barberId: barberId,
+      serviceId: serviceId,
+      appointmentDate: new Date('2025-01-26'),
+      timeSlot: '11:00',
+      status: 'confirmed',
+      notes: 'Test appointment without payment'
+    }).returning();
+
+    if (!testAppointment[0]) {
+      return c.json(errorResponse(500, 'Failed to create test appointment'), 500);
+    }
+
+    // Test the barber notification (should use service price as fallback)
+    const result = await sendBarberNotification(testAppointment[0].id);
+    
+    if (result.success) {
+      return c.json(successResponse(200, {
+        message: 'Barber notification test completed successfully (no payment, using service price)',
+        messageId: result.messageId,
+        appointmentId: testAppointment[0].id
       }));
     } else {
       return c.json(errorResponse(400, 'Failed to send barber notification', result.error), 400);

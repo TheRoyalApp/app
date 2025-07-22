@@ -386,16 +386,12 @@ paymentsRoute.post('/webhook', async (c) => {
 
             // Check if the time slot is available before creating appointment
             if (barberId && appointmentDate && timeSlot) {
-              // Temporarily skip availability check for testing
-              /*
               const { isTimeSlotAvailable } = await import('../schedules/schedules.controller.js');
               const isAvailable = await isTimeSlotAvailable(barberId, appointmentDate, timeSlot as TimeSlot);
               if (!isAvailable) {
                 console.error(`❌ Time slot not available: ${timeSlot} on ${appointmentDate} for barber ${barberId}`);
                 throw new Error(`El horario seleccionado (${timeSlot}) no está disponible para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
               }
-              */
-              console.log('⚠️ Skipping availability check for testing');
               
               // Additional check: verify no duplicate appointments exist
               const dateParts = appointmentDate.split('/');
@@ -486,18 +482,7 @@ paymentsRoute.post('/webhook', async (c) => {
                           console.error('❌ Error sending WhatsApp confirmation:', notificationError);
                         }
 
-                        // Send barber notification for new appointment
-                        console.log('👨‍💼 Sending barber notification for appointment:', appointment.id);
-                        try {
-                          const barberNotificationResult = await sendBarberNotification(appointment.id, tx);
-                          if (barberNotificationResult.success) {
-                            console.log('✅ Barber notification sent successfully');
-                          } else {
-                            console.error('❌ Failed to send barber notification:', barberNotificationResult.error);
-                          }
-                        } catch (barberNotificationError) {
-                          console.error('❌ Error sending barber notification:', barberNotificationError);
-                        }
+
                       } else {
                         console.error('❌ Failed to create appointment - no appointment returned');
                         throw new Error('Failed to create appointment');
@@ -528,10 +513,12 @@ paymentsRoute.post('/webhook', async (c) => {
 
             // Log paymentType for debugging
             console.log('Webhook paymentType:', paymentType);
-            // Create payment record
+            // Create payment record - convert Stripe amount from cents to MXN
+            const amountInCents = session.amount_total || 0;
+            const amountInMXN = (amountInCents / 100).toFixed(2);
             const paymentData = {
               appointmentId,
-              amount: (session.amount_total || 0).toString(), // Convert to string for decimal
+              amount: amountInMXN, // Convert cents to MXN
               paymentMethod: 'stripe',
               paymentType: paymentType || 'full', // Fallback to 'full' if missing
               status: 'completed',
@@ -544,6 +531,22 @@ paymentsRoute.post('/webhook', async (c) => {
               throw new Error('Failed to create payment record');
             }
             console.log('✅ Payment created successfully:', payment.id);
+            
+            // Send barber notification after payment is created and linked
+            if (appointmentId) {
+              console.log('👨‍💼 Sending barber notification for appointment:', appointmentId);
+              try {
+                const barberNotificationResult = await sendBarberNotification(appointmentId, tx);
+                if (barberNotificationResult.success) {
+                  console.log('✅ Barber notification sent successfully');
+                } else {
+                  console.error('❌ Failed to send barber notification:', barberNotificationResult.error);
+                }
+              } catch (barberNotificationError) {
+                console.error('❌ Error sending barber notification:', barberNotificationError);
+              }
+            }
+            
             return { payment, appointment: appointmentId ? { id: appointmentId } : null };
           });
           console.log(`🎉 Payment completed successfully for service ${serviceId} with ${paymentType} payment`);
@@ -604,9 +607,11 @@ paymentsRoute.post('/test-webhook', async (c) => {
     
     // Use a transaction to ensure both payment and appointment are created together
     const result = await db.transaction(async (tx) => {
-      // 1. Create payment record
+      // 1. Create payment record - convert amount from cents to MXN
+      const amountInCents = amount || 2500;
+      const amountInMXN = (amountInCents / 100).toFixed(2);
       const [payment] = await tx.insert(payments).values({
-        amount: (amount || 2500).toString(),
+        amount: amountInMXN,
         paymentMethod: 'stripe',
         paymentType: paymentType, // Store the payment type
         status: 'completed',

@@ -30,8 +30,6 @@ export async function sendAppointmentConfirmation(appointmentId: string, db?: an
         customerPhone: users.phone,
         customerName: users.firstName,
         customerLastName: users.lastName,
-        barberName: users.firstName,
-        barberLastName: users.lastName,
         serviceName: services.name
       })
       .from(appointments)
@@ -63,13 +61,26 @@ export async function sendAppointmentConfirmation(appointmentId: string, db?: an
       };
     }
 
+    // Get barber information separately
+    const barberData = await database
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName
+      })
+      .from(users)
+      .where(eq(users.id, appointment.barberId))
+      .limit(1);
+
+    const barberName = barberData[0] ? `${barberData[0].firstName} ${barberData[0].lastName}`.trim() : 'Barbero';
+
     // Generate confirmation message with proper date formatting
     const message = generateConfirmationMessage({
       customerName: appointment.customerName || 'Cliente',
       serviceName: appointment.serviceName || 'Servicio',
       appointmentDate: appointment.appointmentDate.toISOString(),
       timeSlot: appointment.timeSlot,
-      barberName: appointment.barberName || 'Barbero'
+      barberName: barberName
     });
 
     // Send WhatsApp message
@@ -121,8 +132,6 @@ export async function sendAppointmentReminder(appointmentId: string): Promise<{
         customerPhone: users.phone,
         customerName: users.firstName,
         customerLastName: users.lastName,
-        barberName: users.firstName,
-        barberLastName: users.lastName,
         serviceName: services.name
       })
       .from(appointments)
@@ -154,13 +163,26 @@ export async function sendAppointmentReminder(appointmentId: string): Promise<{
       };
     }
 
+    // Get barber information separately
+    const barberData = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName
+      })
+      .from(users)
+      .where(eq(users.id, appointment.barberId))
+      .limit(1);
+
+    const barberName = barberData[0] ? `${barberData[0].firstName} ${barberData[0].lastName}`.trim() : 'Barbero';
+
     // Generate reminder message with proper date formatting
     const message = generateReminderMessage({
       customerName: appointment.customerName || 'Cliente',
       serviceName: appointment.serviceName || 'Servicio',
       appointmentDate: appointment.appointmentDate.toISOString(),
       timeSlot: appointment.timeSlot,
-      barberName: appointment.barberName || 'Barbero'
+      barberName: barberName
     });
 
     // Send WhatsApp message
@@ -349,6 +371,7 @@ export async function sendBarberNotification(appointmentId: string, db?: any): P
         barberName: users.firstName,
         barberLastName: users.lastName,
         serviceName: services.name,
+        servicePrice: services.price,
         paymentAmount: payments.amount
       })
       .from(appointments)
@@ -403,7 +426,7 @@ export async function sendBarberNotification(appointmentId: string, db?: any): P
       appointmentDate: appointment.appointmentDate.toISOString(),
       timeSlot: appointment.timeSlot,
       customerPhone: appointment.customerPhone || 'N/A',
-      paymentAmount: appointment.paymentAmount || 'N/A'
+      paymentAmount: appointment.paymentAmount || appointment.servicePrice || 'N/A'
     });
 
     // Send WhatsApp message to barber

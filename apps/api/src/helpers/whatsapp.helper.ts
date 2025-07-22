@@ -195,7 +195,17 @@ export function generateBarberNotificationMessage(appointmentData: {
   
   const formattedDateTime = formatAppointmentDateTime(appointmentDate, timeSlot);
   const customerFullName = `${customerName} ${customerLastName}`.trim();
-  const paymentInfo = paymentAmount ? `💰 *Pago:* $${paymentAmount} MXN` : '';
+  
+  // Format payment amount - if it's a number, format it properly
+  let paymentInfo = '';
+  if (paymentAmount && paymentAmount !== 'N/A') {
+    const amount = parseFloat(paymentAmount);
+    if (!isNaN(amount)) {
+      paymentInfo = `💰 *Pago:* $${amount.toFixed(2)} MXN`;
+    } else {
+      paymentInfo = `💰 *Pago:* $${paymentAmount} MXN`;
+    }
+  }
   
   return `🎉 *Nueva Cita Reservada*
 
