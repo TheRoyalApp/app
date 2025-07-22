@@ -31,12 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [isFirstTime, setIsFirstTime] = useState(true);
 
-  console.log('=== AUTH PROVIDER STATE ===');
-  console.log('user:', user ? 'User exists' : 'No user');
-  console.log('isLoading:', isLoading);
-  console.log('isFirstTime:', isFirstTime);
-  console.log('shouldShowAuth:', isFirstTime || !user);
-  console.log('=== END AUTH PROVIDER STATE ===');
+
 
   useEffect(() => {
     // Check if user is already logged in and if it's first time
@@ -47,7 +42,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const backupTimer = setTimeout(() => {
       if (isLoading) {
-        console.log('Backup timer triggered - forcing auth screens');
         setIsLoading(false);
         setIsFirstTime(true);
         setUser(null);
@@ -61,8 +55,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      console.log('=== AUTH CONTEXT: Starting checkAuthStatus ===');
-      
       // Add a timeout to prevent getting stuck
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Auth check timeout')), 5000); // Reduced to 5 second timeout
@@ -71,52 +63,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const authCheckPromise = async () => {
         try {
           // Ensure API client is initialized with tokens from storage
-          console.log('Initializing API client...');
           await apiClient.initialize();
           
           // Check if it's the first time opening the app
-          console.log('Checking if user has seen welcome screen...');
           const hasSeenWelcome = await getItem('hasSeenWelcome');
-          console.log('hasSeenWelcome from storage:', hasSeenWelcome);
           setIsFirstTime(!hasSeenWelcome);
-          console.log('isFirstTime set to:', !hasSeenWelcome);
           
           // If it's first time, don't even try to authenticate
           if (!hasSeenWelcome) {
-            console.log('First time user, skipping authentication check');
             return;
           }
           
-          console.log('=== AUTH CONTEXT DEBUG ===');
-          
           // Check if user is authenticated with the API
-          console.log('Checking if user is authenticated...');
           const isAuthenticated = await AuthService.isAuthenticated();
-          console.log('isAuthenticated result:', isAuthenticated);
           
           if (isAuthenticated) {
-            console.log('User appears authenticated, fetching profile...');
             // Get current user data
             const response = await AuthService.getCurrentUser();
-            console.log('getCurrentUser response:', response);
             
             if (response.success && response.data) {
-              console.log('User loaded successfully:', response.data);
               setUser(response.data);
             } else {
-              console.log('Failed to get user data:', response.error);
               // Clear tokens if user data fetch fails
               await redirectToWelcome();
             }
           } else {
-            console.log('User not authenticated');
             // Clear any stored tokens and redirect to welcome
             await redirectToWelcome();
           }
-          
-          console.log('=== END AUTH CONTEXT DEBUG ===');
         } catch (innerError) {
-          console.error('Inner error in auth check:', innerError);
           // On any inner error, redirect to welcome
           await redirectToWelcome();
         }
@@ -145,10 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       // Don't reset isFirstTime when clearing storage - let it stay as it was
       // This ensures users who have seen welcome screen don't see it again
-      console.log('Storage cleared, user set to null');
-      console.log('=== END CLEARING STORAGE ===');
     } catch (error) {
-      console.error('Error clearing storage:', error);
       // Force reset state even if storage fails
       setUser(null);
     }
@@ -159,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setItem('hasSeenWelcome', 'true');
       setIsFirstTime(false);
     } catch (error) {
-      console.error('Error marking welcome as seen:', error);
+      // Error handling silently
     }
   };
 
@@ -170,9 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await deleteItem('accessToken');
       await deleteItem('refreshToken');
       setUser(null);
-      console.log('Redirected to welcome - user cleared');
     } catch (error) {
-      console.error('Error redirecting to welcome:', error);
       setUser(null);
     }
   };
@@ -184,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(response.data);
       }
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      // Error handling silently
     }
   };
 
@@ -193,27 +163,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       
       const credentials: LoginCredentials = { email, password };
-      console.log('Attempting sign in with:', { email });
       
       const response = await AuthService.login(credentials);
-      console.log('Login response:', response);
       
       if (response.success && response.data) {
-        console.log('Login successful, user data:', response.data.user);
-        console.log('Tokens received - Access:', !!response.data.accessToken, 'Refresh:', !!response.data.refreshToken);
-        
         setUser(response.data.user);
         // Store user data in secure storage for offline access
         await setItem('user', JSON.stringify(response.data.user));
-        console.log('User data stored in secure storage');
         
         return true;
       }
       
-      console.log('Login failed:', response.error);
       return false;
     } catch (error) {
-      console.error('Sign in error:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -243,7 +205,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return false;
     } catch (error) {
-      console.error('Sign up error:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -261,10 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearStorage();
       await deleteItem('hasSeenWelcome');
       setIsFirstTime(true);
-      
-      console.log('User signed out - redirecting to welcome screen');
     } catch (error) {
-      console.error('Sign out error:', error);
       // Clear storage even if API call fails
       await clearStorage();
       await deleteItem('hasSeenWelcome');

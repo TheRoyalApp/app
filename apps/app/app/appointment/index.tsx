@@ -60,9 +60,6 @@ export default function AppointmentScreen() {
 	// Effect to handle initial load and user state changes
 	useEffect(() => {
 		if (user && !hasAttemptedLoad) {
-			if (__DEV__) {
-				console.log('🎯 User available for appointment screen, loading initial data');
-			}
 			loadInitialData();
 			setHasAttemptedLoad(true);
 		} else if (!user && hasAttemptedLoad) {
@@ -83,32 +80,14 @@ export default function AppointmentScreen() {
 		try {
 			setIsLoading(true);
 			
-			console.log('🚀 Starting initial data load...');
-			
 			// Load services and barbers in parallel with proper error handling
 			const [servicesResult, barbersResult] = await Promise.allSettled([
 				loadServices(),
 				loadBarbers()
 			]);
 			
-			console.log('📊 Initial data load results:', {
-				services: servicesResult.status,
-				barbers: barbersResult.status
-			});
-			
-			// Check if we have at least some data
-			const hasServices = services.length > 0;
-			const hasBarbers = barbers.length > 0;
-			
-			console.log('📈 Data availability:', {
-				hasServices,
-				hasBarbers,
-				servicesCount: services.length,
-				barbersCount: barbers.length
-			});
-			
 		} catch (error) {
-			console.error('Error loading initial data:', error);
+			// Error handling silently
 		} finally {
 			setIsLoading(false);
 		}

@@ -40,9 +40,6 @@ export class ServicesService {
       // Check cache first
       const now = Date.now();
       if (servicesCache && (now - servicesCacheTime) < CACHE_DURATION) {
-        if (__DEV__) {
-          console.log('Using cached services data');
-        }
         return {
           success: true,
           data: servicesCache,
@@ -55,9 +52,6 @@ export class ServicesService {
         // Update cache
         servicesCache = response.data;
         servicesCacheTime = now;
-        if (__DEV__) {
-          console.log('Updated services cache with', response.data.length, 'services');
-        }
       }
 
       return response;
@@ -167,8 +161,5 @@ export class ServicesService {
   static clearCache() {
     servicesCache = null;
     servicesCacheTime = 0;
-    if (__DEV__) {
-      console.log('Services cache cleared');
-    }
   }
 } 

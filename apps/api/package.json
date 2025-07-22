@@ -7,6 +7,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node-cron": "^3.0.11",
     "drizzle-kit": "^0.31.4"
   },
   "scripts": {
@@ -21,6 +22,7 @@
     "test:coverage": "bun test --coverage tests/",
     "test:full": "bun run tests/run-production-tests.js",
     "cron:reminders": "bun run src/scripts/reminder-cron.ts",
+    "test:date-formatting": "bun run src/scripts/test-date-formatting.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -44,6 +46,7 @@
     "drizzle-orm": "^0.44.2",
     "hono": "^4.7.9",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.2.1",
     "nodemon": "^3.1.10",
     "postgres": "^3.4.7",
     "stripe": "^18.2.1",

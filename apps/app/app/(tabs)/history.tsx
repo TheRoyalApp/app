@@ -39,7 +39,6 @@ export default function HistoryScreen() {
 				Alert.alert('Error', 'No se pudieron cargar las citas');
 			}
 		} catch (error) {
-			console.error('Error loading appointments:', error);
 			Alert.alert('Error', 'No se pudieron cargar las citas');
 		} finally {
 			setIsLoading(false);
@@ -53,13 +52,6 @@ export default function HistoryScreen() {
 	};
 
 	const handleReschedule = (appointment: Appointment) => {
-		console.log('🔍 HISTORY RESCHEDULE DEBUG:', {
-			appointmentId: appointment.id,
-			appointmentUserId: appointment.userId,
-			currentUserId: user?.id,
-			appointment,
-			user
-		});
 		router.push(`/appointment/reschedule/${appointment.id}` as any);
 	};
 
@@ -87,7 +79,6 @@ export default function HistoryScreen() {
 								Alert.alert('Error', response.error || 'No se pudo cancelar la cita');
 							}
 						} catch (error) {
-							console.error('Error canceling appointment:', error);
 							Alert.alert('Error', 'No se pudo cancelar la cita');
 						}
 					},

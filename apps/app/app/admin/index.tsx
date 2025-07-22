@@ -84,18 +84,13 @@ const AdminPanel = () => {
   // Fetch appointments, services, and schedules from API
   useEffect(() => {
     if (!isLoading && user) {
-      console.log('AdminPanel: user is set, fetching data:', user);
-      console.log('AdminPanel: activeTab:', activeTab);
       fetchAllData();
-    } else {
-      console.log('AdminPanel: waiting for user or still loading. isLoading:', isLoading, 'user:', user);
     }
   }, [user, isLoading, activeTab]);
 
   // Force refresh when tab changes
   useEffect(() => {
     if (user && !isLoading) {
-      console.log('AdminPanel: Tab changed to:', activeTab);
       fetchAllData();
     }
   }, [activeTab]);
@@ -169,7 +164,6 @@ const AdminPanel = () => {
           
           return aptDate.toDateString() === filterDate.toDateString();
         } catch (error) {
-          console.error('Error parsing date filter:', error);
           return true; // Show all if date parsing fails
         }
       });
@@ -211,7 +205,6 @@ const AdminPanel = () => {
         Alert.alert('No encontrado', 'No se encontró un usuario con ese email');
       }
     } catch (error) {
-      console.error('Error searching user:', error);
       Alert.alert('Error', 'Error al buscar el usuario');
       setSearchedUser(null);
     } finally {
@@ -231,7 +224,6 @@ const AdminPanel = () => {
         Alert.alert('Error', response.error || 'Error al actualizar el rol');
       }
     } catch (error) {
-      console.error('Error updating user role:', error);
       Alert.alert('Error', 'Error al actualizar el rol del usuario');
     } finally {
       setIsUpdatingUserRole(false);
@@ -240,10 +232,8 @@ const AdminPanel = () => {
 
   const fetchAllData = async () => {
     if (!user) {
-      console.log('fetchAllData: No user, aborting fetch.');
       return;
     }
-    console.log('fetchAllData: Starting data fetch for tab:', activeTab);
     setRefreshing(true);
     
     // Appointments

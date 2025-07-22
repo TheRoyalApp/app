@@ -56,10 +56,9 @@ export default function AppointmentDatePicker({
       const debugResponse = await SchedulesService.getDebugAppointments(barberId, date);
       if (debugResponse.success && debugResponse.data) {
         setDebugAppointments(debugResponse.data.appointments || []);
-        console.log('Debug appointments loaded:', debugResponse.data.appointments);
       }
     } catch (error) {
-      console.error('Error loading debug appointments:', error);
+      // Error handling silently
     }
   }
 
@@ -68,9 +67,6 @@ export default function AppointmentDatePicker({
       const { SchedulesService } = await import('@/services');
       const allDebugResponse = await SchedulesService.getAllDebugAppointments(barberId);
       if (allDebugResponse.success && allDebugResponse.data) {
-        console.log('All appointments for barber:', allDebugResponse.data);
-        console.log('Total appointments found:', allDebugResponse.data.totalAppointments);
-        console.log('Appointments details:', allDebugResponse.data.appointments);
         
         // Filter appointments for the selected date
         const selectedDateObj = new Date(selectedDate + 'T00:00:00.000Z');
@@ -84,32 +80,20 @@ export default function AppointmentDatePicker({
           return aptDate >= startOfDay && aptDate <= endOfDay;
         });
         
-        console.log('Appointments for selected date:', selectedDate, appointmentsForSelectedDate);
         setDebugAppointments(appointmentsForSelectedDate);
       }
     } catch (error) {
-      console.error('Error loading all debug appointments:', error);
+      // Error handling silently
     }
   }
 
   const loadAvailability = async (date: string) => {
     try {
       setIsLoadingTimes(true)
-      console.log('Loading availability for date:', date, 'barberId:', barberId)
       
       const response = await SchedulesService.getAvailability(barberId, date)
-      console.log('Availability response:', response)
       
       if (response.success && response.data) {
-        console.log('Availability data received:', {
-          barberId: response.data.barberId,
-          date: response.data.date,
-          availableSlots: response.data.availableSlots,
-          bookedSlots: response.data.bookedSlots,
-          availableSlotsCount: response.data.availableSlots?.length || 0,
-          bookedSlotsCount: response.data.bookedSlots?.length || 0
-        })
-        
         setAvailability(response.data)
         
         // Also load debug appointments to get the most accurate data
@@ -140,7 +124,6 @@ export default function AppointmentDatePicker({
         )
       }
     } catch (error) {
-      console.error('Error loading availability:', error)
       setAvailability(null)
       Alert.alert(
         'Error de conexión',
@@ -302,15 +285,8 @@ export default function AppointmentDatePicker({
       const isBooked = bookedTimes.some(bookedTime => {
         const normalizedBookedTime = normalizeTime(bookedTime)
         const matches = normalizedBookedTime === normalizedSlotTime
-        if (matches) {
-          console.log(`[getAvailableTimeSlots] Found booked slot: ${slot.time} matches ${bookedTime} (normalized: ${normalizedSlotTime} === ${normalizedBookedTime})`)
-        }
         return matches
       })
-
-      if (isBooked) {
-        console.log(`[getAvailableTimeSlots] Filtering out booked slot: ${slot.time}`)
-      }
 
       return !isBooked
     })
@@ -339,14 +315,12 @@ export default function AppointmentDatePicker({
       )
       
       if (hasExistingAppointments) {
-        console.log(`[getAvailableTimeSlots] Filtering out slot with existing appointments: ${slot.time}`)
         return false
       }
       
       return true
     })
 
-    console.log('[getAvailableTimeSlots] Final available slots after debug filtering:', finalFilteredSlots.map(s => s.time))
     return finalFilteredSlots
   }
 

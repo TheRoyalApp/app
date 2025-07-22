@@ -7,6 +7,7 @@ import { rateLimits } from './middleware/rate-limit.middleware.js';
 import winstonLogger from './helpers/logger.js';
 import { errorResponse } from './helpers/response.helper.js';
 import { getDatabase } from './db/connection.js';
+import cronService from './services/cron.service.js';
 
 // Import routes
 import authRoutes from './auth/auth.route.js';
@@ -115,11 +116,13 @@ app.notFound((c) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   winstonLogger.info('SIGTERM received, shutting down gracefully');
+  cronService.stopReminderJob();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   winstonLogger.info('SIGINT received, shutting down gracefully');
+  cronService.stopReminderJob();
   process.exit(0);
 });
 
@@ -148,8 +151,12 @@ const startServer = async () => {
     await getDatabase();
     winstonLogger.info('✅ Database connection established successfully');
 
-    // Get port from environment or default
-    const port = parseInt(process.env.PORT || '8080', 10);
+    // Start the reminder cron job
+    cronService.startReminderJob();
+    winstonLogger.info('⏰ Reminder cron job started successfully');
+
+    // Get port from environment or default to 3001 for Stripe webhook listening
+    const port = parseInt(process.env.PORT || '3001', 10);
     
     // Start server
     const server = Bun.serve({
@@ -159,14 +166,18 @@ const startServer = async () => {
     });
 
     winstonLogger.info(`🚀 Server starting on port ${port}`);
+    winstonLogger.info(`🔔 Stripe webhook listening on port ${port}`);
     winstonLogger.info(`📱 API ready for mobile app integration`);
     winstonLogger.info(`🔒 Production features enabled: Rate limiting, CORS, Validation, Logging`);
+    winstonLogger.info(`⏰ Automated reminders enabled - checking every minute`);
     
     // Only log to console in development
     if (process.env.NODE_ENV === 'development') {
       console.log(`🚀 Server running at http://localhost:${port}`);
+      console.log(`🔔 Stripe webhook endpoint: http://localhost:${port}/payments/webhook`);
       console.log(`📊 Health check: http://localhost:${port}/health`);
       console.log(`📚 API info: http://localhost:${port}/`);
+      console.log(`⏰ Reminder system: http://localhost:${port}/notifications/health`);
     }
 
   } catch (error) {

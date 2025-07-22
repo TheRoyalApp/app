@@ -97,7 +97,6 @@ export default function ProfileScreen() {
 				Alert.alert('Error', response.error || 'No se pudo actualizar el perfil');
 			}
 		} catch (error) {
-			console.error('Error updating profile:', error);
 			Alert.alert('Error', 'Ocurrió un error al actualizar el perfil');
 		} finally {
 			setIsLoading(false);
@@ -116,7 +115,6 @@ export default function ProfileScreen() {
 			await signOut();
 			setShowLogoutModal(false);
 		} catch (error) {
-			console.error('Logout error:', error);
 			Alert.alert('Error', 'Ocurrió un error al cerrar sesión');
 		} finally {
 			setIsLoading(false);

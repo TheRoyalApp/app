@@ -60,7 +60,6 @@ export default function AppointmentReminder({ appointment }: AppointmentReminder
 
 			// Check if date is valid
 			if (isNaN(date.getTime())) {
-				console.warn('Invalid date format:', dateString);
 				return 'Fecha inválida';
 			}
 
@@ -70,7 +69,6 @@ export default function AppointmentReminder({ appointment }: AppointmentReminder
 				day: 'numeric',
 			});
 		} catch (error) {
-			console.error('Error formatting date:', dateString, error);
 			return 'Fecha inválida';
 		}
 	};

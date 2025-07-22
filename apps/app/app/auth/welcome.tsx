@@ -35,7 +35,6 @@ export default function WelcomeScreen() {
   const handleClearStorage = async () => {
     await clearStorage();
     // This will redirect to welcome screen since no user is authenticated
-    console.log('Storage cleared - user will be redirected to welcome');
   };
 
   return (

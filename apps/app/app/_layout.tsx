@@ -39,13 +39,7 @@ function RootLayoutNav() {
 	const [forceUpdate, setForceUpdate] = React.useState(0);
 	const router = useRouter();
 
-	console.log('=== ROOT LAYOUT NAV DEBUG ===');
-	console.log('isLoading:', isLoading);
-	console.log('isFirstTime:', isFirstTime);
-	console.log('user:', user ? 'User exists' : 'No user');
-	console.log('shouldShowAuth:', isFirstTime || !user);
-	console.log('forceUpdate:', forceUpdate);
-	console.log('=== END ROOT LAYOUT NAV DEBUG ===');
+
 
 	// Force re-render when auth state changes
 	React.useEffect(() => {
@@ -61,7 +55,6 @@ function RootLayoutNav() {
 	React.useEffect(() => {
 		const timer = setTimeout(() => {
 			if (isLoading) {
-				console.log('Auth check taking too long, showing fallback auth screens');
 				setShowFallback(true);
 			}
 		}, 8000); // Increased to 8 second timeout
@@ -78,9 +71,6 @@ function RootLayoutNav() {
 		let paymentCancelled = false; // Global flag to track if payment was cancelled
 
 		const handleUrl = (url: string) => {
-			console.log('🔗 Global URL handler received:', url);
-			console.log('👤 Current user state:', user ? 'Authenticated' : 'Not authenticated');
-			console.log('⏳ Loading state:', isLoading ? 'Loading' : 'Ready');
 			
 			// Only clear payment callback timeout if this is a payment-related deep link
 			if (url.includes('app://payment/') || url.includes('app://payment-callback')) {
@@ -108,7 +98,6 @@ function RootLayoutNav() {
 				try {
 					urlObj = new URL(url);
 				} catch (urlError) {
-					console.error('Failed to parse URL:', url, urlError);
 					// Show success message even if URL parsing fails
 					if (!alertShown) {
 						alertShown = true;
@@ -142,8 +131,6 @@ function RootLayoutNav() {
 						amount: amount ? decodeURIComponent(amount) : '0',
 					};
 					
-					console.log('Attempting to navigate to success screen with params:', decodedParams);
-					
 					// Wait for navigation to be ready and user to be authenticated
 					const attemptNavigation = () => {
 						try {
@@ -153,14 +140,11 @@ function RootLayoutNav() {
 									pathname: '/payment/success',
 									params: decodedParams
 								});
-								console.log('✅ Successfully navigated to payment success screen');
 								return true; // Navigation successful
 							} else {
-								console.log('Navigation not ready yet, retrying...');
 								return false; // Navigation failed, will retry
 							}
 						} catch (navError) {
-							console.error('Global navigation error in success handler:', navError);
 							// Fallback to alert if navigation fails
 							if (!alertShown) {
 								alertShown = true;
@@ -181,15 +165,12 @@ function RootLayoutNav() {
 						const retryDelays = [500, 1000, 2000];
 						retryDelays.forEach((delay, index) => {
 							setTimeout(() => {
-								if (!attemptNavigation()) {
-									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
-								}
+								attemptNavigation();
 							}, delay);
 						});
 						
 						// Final fallback after 5 seconds
 						setTimeout(() => {
-							console.log('🔄 Final fallback: Showing success alert');
 							if (!alertShown) {
 								alertShown = true;
 								WebBrowser.dismissBrowser();
@@ -202,7 +183,6 @@ function RootLayoutNav() {
 						}, 5000);
 					}
 				} else {
-					console.warn('Invalid success URL parameters:', { status, timeSlot });
 					// Show success message even if parameters are invalid
 					if (!alertShown) {
 						alertShown = true;

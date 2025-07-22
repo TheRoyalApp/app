@@ -81,12 +81,7 @@ export default function DatePicker({
           const pad = (n: number) => n.toString().padStart(2, '0');
           const todayString = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
           const selectedString = normalizeDate(selectedDate);
-          // Debug log before filtering
-          console.log('[DatePicker] Pre-filter', { selectedDate, selectedString, todayString, slots });
-          if (!slots || slots.length === 0) {
-            console.warn('[DatePicker] No slots available before filtering', { slots });
-          }
-          // Always run filtering and logging for any selected date
+          // Always run filtering for any selected date
           const nowMinutes = now.getHours() * 60 + now.getMinutes();
           const filteredSlots = slots.filter(time => {
             let cleanTime = time.trim();
@@ -99,12 +94,8 @@ export default function DatePicker({
             // For today, filter out past slots; for other days, show all
             const isToday = selectedString === todayString;
             const keep = isToday ? slotTimeInMinutes > nowMinutes : true;
-            console.log('[DatePicker] Filtering slot:', { cleanTime, slotTimeInMinutes, nowMinutes, isToday, keep });
             return keep;
           });
-          if (filteredSlots.length === 0 && slots.length > 0) {
-            console.warn('[DatePicker] All slots filtered out for selected date. nowMinutes:', nowMinutes, 'slots:', slots)
-          }
           setAvailableSlots(filteredSlots);
         } else {
           setAvailableSlots([])

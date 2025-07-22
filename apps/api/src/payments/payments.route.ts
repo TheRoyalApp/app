@@ -13,6 +13,7 @@ import {
   getUserPayments 
 } from './payments.controller.js';
 import type { TimeSlot } from '../schedules/schedules.d.js';
+import { sendAppointmentConfirmation } from '../notifications/notifications.controller.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-05-28.basil',
@@ -471,6 +472,19 @@ paymentsRoute.post('/webhook', async (c) => {
                       if (appointment) {
                         console.log('✅ Appointment created successfully:', appointment.id);
                         appointmentId = appointment.id;
+                        
+                        // Send WhatsApp confirmation message immediately after appointment creation
+                        console.log('📱 Sending WhatsApp confirmation for appointment:', appointment.id);
+                        try {
+                          const notificationResult = await sendAppointmentConfirmation(appointment.id, tx);
+                          if (notificationResult.success) {
+                            console.log('✅ WhatsApp confirmation sent successfully');
+                          } else {
+                            console.error('❌ Failed to send WhatsApp confirmation:', notificationResult.error);
+                          }
+                        } catch (notificationError) {
+                          console.error('❌ Error sending WhatsApp confirmation:', notificationError);
+                        }
                       } else {
                         console.error('❌ Failed to create appointment - no appointment returned');
                         throw new Error('Failed to create appointment');

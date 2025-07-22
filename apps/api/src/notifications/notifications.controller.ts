@@ -4,20 +4,21 @@ import { appointments, users, services } from "../db/schema.js";
 import { sendWhatsappReminder, generateConfirmationMessage, generateReminderMessage } from "../helpers/whatsapp.helper.js";
 import winstonLogger from "../helpers/logger.js";
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
+import { formatAppointmentDateTime } from '../helpers/date.helper.js';
 
 /**
  * Send confirmation message when appointment is confirmed
  */
-export async function sendAppointmentConfirmation(appointmentId: string): Promise<{
+export async function sendAppointmentConfirmation(appointmentId: string, db?: any): Promise<{
   success: boolean;
   messageId?: string;
   error?: string;
 }> {
   try {
-    const db = await getDatabase();
+    const database = db || await getDatabase();
 
     // Get appointment with user and service details
-    const appointmentData = await db
+    const appointmentData = await database
       .select({
         id: appointments.id,
         userId: appointments.userId,
@@ -62,20 +63,11 @@ export async function sendAppointmentConfirmation(appointmentId: string): Promis
       };
     }
 
-    // Format date for display
-    const appointmentDate = new Date(appointment.appointmentDate);
-    const formattedDate = appointmentDate.toLocaleDateString('es-ES', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Generate confirmation message
+    // Generate confirmation message with proper date formatting
     const message = generateConfirmationMessage({
       customerName: appointment.customerName || 'Cliente',
       serviceName: appointment.serviceName || 'Servicio',
-      appointmentDate: formattedDate,
+      appointmentDate: appointment.appointmentDate.toISOString(),
       timeSlot: appointment.timeSlot,
       barberName: appointment.barberName || 'Barbero'
     });
@@ -162,11 +154,11 @@ export async function sendAppointmentReminder(appointmentId: string): Promise<{
       };
     }
 
-    // Generate reminder message
+    // Generate reminder message with proper date formatting
     const message = generateReminderMessage({
       customerName: appointment.customerName || 'Cliente',
       serviceName: appointment.serviceName || 'Servicio',
-      appointmentDate: new Date(appointment.appointmentDate).toLocaleDateString('es-ES'),
+      appointmentDate: appointment.appointmentDate.toISOString(),
       timeSlot: appointment.timeSlot,
       barberName: appointment.barberName || 'Barbero'
     });

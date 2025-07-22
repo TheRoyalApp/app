@@ -133,12 +133,9 @@ export class AuthService {
   // Get current user profile
   static async getCurrentUser(): Promise<ApiResponse<User>> {
     try {
-      console.log('AuthService: Getting current user profile...');
       const response = await apiClient.get<User>('/users/profile');
-      console.log('AuthService: Profile response:', response);
       return response;
     } catch (error) {
-      console.log('AuthService: Error getting user profile:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get user profile',

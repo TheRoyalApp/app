@@ -24,16 +24,11 @@ export default function HomeScreen() {
 	const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
 	const [hasShownAlert, setHasShownAlert] = useState(false);
 
-	if (__DEV__) {
-		console.log('🏠 HomeScreen rendered. User:', user?.name || 'No user', 'Loading:', isLoading, 'HasAttemptedFetch:', hasAttemptedFetch);
-	}
+
 
 	// Effect to handle initial load and user state changes
 	useEffect(() => {
 		if (user && !hasAttemptedFetch) {
-			if (__DEV__) {
-				console.log('🎯 User available, attempting initial fetch');
-			}
 			fetchUpcomingAppointment();
 			setHasAttemptedFetch(true);
 			// Reset alert state when user logs in
@@ -50,10 +45,6 @@ export default function HomeScreen() {
 
 	useFocusEffect(
 		useCallback(() => {
-			if (__DEV__) {
-				console.log('🎯 useFocusEffect triggered - user:', user?.name || 'No user');
-			}
-			
 			// Only fetch if user is available and we haven't attempted yet
 			if (user && !hasAttemptedFetch) {
 				fetchUpcomingAppointment();
@@ -65,15 +56,8 @@ export default function HomeScreen() {
 	const fetchUpcomingAppointment = async () => {
 		try {
 			setIsLoading(true);
-			if (__DEV__) {
-				console.log('🔄 Fetching appointments...');
-				console.log('👤 Current user:', user);
-			}
 
 			if (!user) {
-				if (__DEV__) {
-					console.log('❌ No user authenticated - skipping API call');
-				}
 				setUpcomingAppointment(null);
 				setIsLoading(false);
 				return;
@@ -82,30 +66,7 @@ export default function HomeScreen() {
 			// Use the optimized API client with caching
 			const response = await AppointmentsService.getUserAppointments();
 
-			if (__DEV__) {
-				console.log('📊 API Response:', {
-					success: response.success,
-					dataLength: response.data?.length || 0,
-					error: response.error,
-					rawData: response.data
-				});
-			}
-
 			if (response.success && response.data && response.data.length > 0) {
-				if (__DEV__) {
-					console.log('📋 Raw API data structure:', response.data[0]);
-					console.log('📊 All appointments received:', response.data.length);
-					response.data.forEach((apt: any, index) => {
-						console.log(`📋 Appointment ${index + 1}:`, {
-							id: apt.id,
-							date: apt.appointmentDate,
-							time: apt.timeSlot,
-							status: apt.status,
-							service: apt.serviceName || apt.service?.name,
-							barber: apt.barberName || apt.barber?.name
-						});
-					});
-				}
 
 				// Filter upcoming appointments (confirmed or pending status, and future dates)
 				const upcomingAppointments = response.data
@@ -127,56 +88,21 @@ export default function HomeScreen() {
 						appointmentDateOnly.setHours(0, 0, 0, 0);
 
 						const isFuture = appointmentDate > now || appointmentDateOnly.getTime() === today.getTime();
-						if (__DEV__ && !isFuture) {
-							console.log('❌ Filtered out - not future. Appointment:', {
-								id: appointment.id,
-								appointmentDateTime: appointmentDate.toString(),
-								now: now.toString(),
-								status: appointment.status,
-								rawDate: appointment.appointmentDate,
-								timeSlot: appointment.timeSlot,
-								combinedDateTime: appointmentDate.toString()
-							});
-						} else if (__DEV__) {
-							console.log('✅ Future appointment found:', {
-								id: appointment.id,
-								appointmentDateTime: appointmentDate.toString(),
-								now: now.toString(),
-								status: appointment.status,
-								timeSlot: appointment.timeSlot
-							});
-						}
 						return isFuture;
 					})
 					.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
 
-				if (__DEV__) {
-					console.log('✅ Filtered upcoming appointments:', upcomingAppointments.length, upcomingAppointments);
-				}
-
 				// Get the next upcoming appointment
 				if (upcomingAppointments.length > 0) {
-					if (__DEV__) {
-						console.log('🎯 Next appointment:', upcomingAppointments[0]);
-					}
 					setUpcomingAppointment(upcomingAppointments[0]);
 				} else {
-					if (__DEV__) {
-						console.log('❌ No upcoming appointments found');
-					}
 					setUpcomingAppointment(null);
 				}
 			} else {
-				if (__DEV__) {
-					console.log('❌ No appointments data or API failed');
-				}
 				setUpcomingAppointment(null);
 			}
 			setResponse(response);
 		} catch (error) {
-			if (__DEV__) {
-				console.error('Error fetching upcoming appointment:', error);
-			}
 			Alert.alert('Error', 'Failed to load appointment data');
 		} finally {
 			setIsLoading(false);
@@ -316,30 +242,16 @@ export default function HomeScreen() {
 							secondary
 							disabled={!upcomingAppointment}
 							onPress={() => {
-								console.log('🔍 RESCHEDULE BUTTON CLICKED');
-								console.log('upcomingAppointment:', upcomingAppointment);
-								console.log('user:', user);
-
 								if (upcomingAppointment) {
-									console.log('🔍 RESCHEDULE NAVIGATION DEBUG:', {
-										appointmentId: upcomingAppointment.id,
-										appointmentUserId: upcomingAppointment.userId,
-										currentUserId: user?.id,
-										appointment: upcomingAppointment
-									});
-
 									try {
 										// Add a small delay to show button press feedback
 										setTimeout(() => {
-											console.log('🚀 Navigating to reschedule page...');
 											router.push(`/appointment/reschedule/${upcomingAppointment.id}`);
 										}, 100);
 									} catch (error) {
-										console.error('❌ Navigation error:', error);
 										Alert.alert('Error', 'No se pudo abrir la página de reprogramación');
 									}
 								} else {
-									console.log('❌ No appointment available for reschedule');
 									Alert.alert('Sin citas', 'No tienes citas disponibles para reprogramar');
 								}
 							}}

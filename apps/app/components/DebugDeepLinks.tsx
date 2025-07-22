@@ -89,7 +89,6 @@ export default function DebugDeepLinks() {
           <Text style={styles.sectionTitle}>🌐 API Performance</Text>
           <TouchableOpacity style={styles.button} onPress={() => {
             const apiMetrics = getApiPerformance();
-            console.log('API Performance Metrics:', apiMetrics);
           }}>
             <Text style={styles.buttonText}>Log API Metrics to Console</Text>
           </TouchableOpacity>

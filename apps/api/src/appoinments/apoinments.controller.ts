@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { getDatabase } from "../db/connection.js";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { appointments, users, services } from "../db/schema.js";
+import { appointments, users, services, payments } from "../db/schema.js";
 import type { Appointment, Status } from "./appoinments.d.js";
 import { isTimeSlotAvailable } from "../schedules/schedules.controller.js";
 import type { TimeSlot } from "../schedules/schedules.d.js";

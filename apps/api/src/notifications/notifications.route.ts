@@ -3,6 +3,7 @@ import { sendAppointmentConfirmation, sendAppointmentReminder, checkAndSendRemin
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { testWhatsAppConnection } from '../helpers/whatsapp.helper.js';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
+import cronService from '../services/cron.service.js';
 
 const notificationsRoute = new Hono();
 
@@ -132,16 +133,52 @@ notificationsRoute.post('/check-reminders', async (c) => {
 notificationsRoute.get('/health', async (c) => {
   try {
     const connectionTest = await testWhatsAppConnection();
+    const cronStatus = cronService.getStatus();
     
     return c.json(successResponse(200, {
       service: 'WhatsApp Notifications',
       status: connectionTest.success ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER)
+      twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
+      cronJob: {
+        isRunning: cronStatus.isRunning,
+        schedule: cronStatus.schedule,
+        timezone: cronStatus.timezone
+      }
     }));
   } catch (error) {
     return c.json(errorResponse(500, 'Health check failed', error), 500);
+  }
+});
+
+// Get cron service status
+notificationsRoute.get('/cron/status', async (c) => {
+  try {
+    const status = cronService.getStatus();
+    
+    return c.json(successResponse(200, {
+      message: 'Cron service status retrieved successfully',
+      status,
+      timestamp: new Date().toISOString()
+    }));
+  } catch (error) {
+    return c.json(errorResponse(500, 'Failed to get cron status', error), 500);
+  }
+});
+
+// Manually trigger reminder check
+notificationsRoute.post('/cron/trigger', async (c) => {
+  try {
+    const result = await cronService.triggerReminderCheck();
+    
+    return c.json(successResponse(200, {
+      message: 'Manual reminder check triggered successfully',
+      result,
+      timestamp: new Date().toISOString()
+    }));
+  } catch (error) {
+    return c.json(errorResponse(500, 'Failed to trigger reminder check', error), 500);
   }
 });
 

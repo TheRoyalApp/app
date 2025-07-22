@@ -1,17 +1,18 @@
 import twilio from 'twilio';
 import winstonLogger from './logger.js';
 import { formatPhoneForTwilio } from './phone.helper.js';
+import { formatAppointmentDateTime, formatTimeForMexico, formatDateForMexico, isToday } from './date.helper.js';
 
 // Initialize Twilio client
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-if (!accountSid || !authToken || !whatsappNumber) {
+if (!accountSid || !authToken || !phoneNumber) {
   winstonLogger.error('Missing Twilio environment variables', {
     accountSid: !!accountSid,
     authToken: !!authToken,
-    whatsappNumber: !!whatsappNumber
+    phoneNumber: !!phoneNumber
   });
 }
 
@@ -45,9 +46,32 @@ export async function sendWhatsappReminder(to: string, message: string): Promise
     
     const formattedPhone = phoneResult.formatted;
 
-    // Format the "to" number for WhatsApp
+    // Check if we're in development mode
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'DEV' || process.env.NODE_ENV === 'DEVELOPMENT' || process.env.NODE_ENV === 'dev';
+    
+    if (isDevelopment) {
+      // Development mode - log to console
+      console.log('\n📱 [TWILIO_WHATSAPP] ======================================');
+      console.log('📞 TO:', formattedPhone);
+      console.log('📞 FROM:', phoneNumber);
+      console.log('💬 MESSAGE:');
+      console.log('─'.repeat(50));
+      console.log(message);
+      console.log('─'.repeat(50));
+      console.log('📊 STATUS: LOGGED (DEV MODE)');
+      console.log('📋 MESSAGE ID: DEV_' + Date.now());
+      console.log('⏰ TIMESTAMP:', new Date().toISOString());
+      console.log('📱 [TWILIO_WHATSAPP] ======================================\n');
+      
+      return { 
+        success: true, 
+        messageId: 'DEV_' + Date.now() 
+      };
+    }
+
+    // Production mode - actually send WhatsApp message
     const whatsappTo = `whatsapp:${formattedPhone}`;
-    const whatsappFrom = `whatsapp:${whatsappNumber}`;
+    const whatsappFrom = `whatsapp:${phoneNumber}`;
 
     winstonLogger.info('Sending WhatsApp message', {
       to: whatsappTo,
@@ -99,14 +123,15 @@ export function generateConfirmationMessage(appointmentData: {
 }): string {
   const { customerName, serviceName, appointmentDate, timeSlot, barberName } = appointmentData;
   
+  const formattedDateTime = formatAppointmentDateTime(appointmentDate, timeSlot);
+  
   return `¡Hola ${customerName}! 🎉
 
 Tu cita ha sido confirmada exitosamente.
 
 📅 *Detalles de tu cita:*
 • Servicio: ${serviceName}
-• Fecha: ${appointmentDate}
-• Hora: ${timeSlot}
+• Fecha y Hora: ${formattedDateTime}
 • Barber: ${barberName}
 
 📍 *Ubicación:* The Royal Barber
@@ -116,7 +141,7 @@ Tu cita ha sido confirmada exitosamente.
 ¡Gracias por elegirnos! ✂️✨
 
 _The Royal Barber_
-_WhatsApp: ${whatsappNumber}`;
+_WhatsApp: ${phoneNumber}`;
 }
 
 /**
@@ -131,15 +156,19 @@ export function generateReminderMessage(appointmentData: {
 }): string {
   const { customerName, serviceName, appointmentDate, timeSlot, barberName } = appointmentData;
   
+  const formattedTime = formatTimeForMexico(timeSlot);
+  const isAppointmentToday = isToday(appointmentDate);
+  const dateText = isAppointmentToday ? 'hoy' : formatDateForMexico(appointmentDate);
+  
   return `⏰ *Recordatorio de cita*
 
 ¡Hola ${customerName}! 
 
-Tu cita está programada para *hoy* en 15 minutos.
+Tu cita está programada para *${dateText}* en 15 minutos.
 
 📅 *Detalles:*
 • Servicio: ${serviceName}
-• Hora: ${timeSlot}
+• Hora: ${formattedTime}
 • Barber: ${barberName}
 
 📍 *Ubicación:* The Royal Barber
@@ -147,7 +176,7 @@ Tu cita está programada para *hoy* en 15 minutos.
 ¡Te esperamos! ✂️✨
 
 _The Royal Barber_
-_WhatsApp: ${whatsappNumber}`;
+_WhatsApp: ${phoneNumber}`;
 }
 
 /**
@@ -158,7 +187,7 @@ export async function testWhatsAppConnection(): Promise<{
   error?: string;
 }> {
   try {
-    if (!accountSid || !authToken || !whatsappNumber) {
+    if (!accountSid || !authToken || !phoneNumber) {
       return {
         success: false,
         error: 'Missing Twilio environment variables'
