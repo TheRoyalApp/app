@@ -681,6 +681,24 @@ const AdminPanel = () => {
     }
   };
 
+  // Helper function to format payment amount correctly
+  const formatPaymentAmount = (amount: string | number | null | undefined) => {
+    if (!amount) return '0.00';
+    
+    // Convert to number and ensure it's treated as dollars, not cents
+    const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    // Debug logging
+    console.log('Payment amount debug:', {
+      original: amount,
+      type: typeof amount,
+      numeric: numericAmount,
+      formatted: numericAmount.toFixed(2)
+    });
+    
+    return numericAmount.toFixed(2);
+  };
+
   const handleCreateAppointment = async () => {
     if (!newAppointment.userId) {
       Alert.alert('Error', 'Debes ingresar el ID del cliente.');
@@ -858,7 +876,7 @@ const AdminPanel = () => {
                     <View style={styles.paymentContainer}>
                       <ThemeText style={styles.paymentLabel}>💰 PAGO:</ThemeText>
                       <ThemeText style={styles.paymentAmount}>
-                        ${parseFloat(a.paymentAmount).toFixed(2)}
+                        ${formatPaymentAmount(a.paymentAmount)}
                       </ThemeText>
                       {a.paymentType && (
                         <View style={[
