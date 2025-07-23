@@ -61,6 +61,25 @@ export default function RescheduleScreen() {
         }
     }, [appointment, allUserAppointments]);
 
+    // Check if appointment has already been rescheduled and redirect
+    useEffect(() => {
+        if (appointment) {
+            const rescheduleCount = appointment.rescheduleCount || 0;
+            if (rescheduleCount >= 1) {
+                Alert.alert(
+                    "No se puede reprogramar",
+                    "Esta cita ya ha sido reprogramada el máximo de veces permitido (1 vez).",
+                    [
+                        {
+                            text: "OK",
+                            onPress: () => router.replace('/(tabs)/history')
+                        }
+                    ]
+                );
+            }
+        }
+    }, [appointment]);
+
     const loadAppointment = async () => {
         try {
             setIsLoading(true);
@@ -190,11 +209,34 @@ export default function RescheduleScreen() {
         // Check if this is the closest upcoming appointment
         const isClosest = isClosestAppointment();
         
+        // Debug logging
+        console.log('=== RESCHEDULE VALIDATION ===');
+        console.log('Appointment ID:', appointment.id);
+        console.log('Status:', appointment.status);
+        console.log('Reschedule Count:', appointment.rescheduleCount);
+        console.log('Can Reschedule Status:', canRescheduleStatus);
+        console.log('Can Reschedule Count:', canRescheduleCount);
+        console.log('Is Within 30 Min:', isWithin30Min);
+        console.log('Is Closest:', isClosest);
+        console.log('Final Can Reschedule:', canRescheduleStatus && canRescheduleCount && !isWithin30Min && isClosest);
+        console.log('================================');
+        
         return canRescheduleStatus && canRescheduleCount && !isWithin30Min && isClosest;
     };
 
     const handleReschedule = () => {
         if (!appointment) return;
+        
+        // Additional safety check for reschedule count
+        if ((appointment.rescheduleCount || 0) >= 1) {
+            Alert.alert(
+                "No se puede reprogramar",
+                "Esta cita ya ha sido reprogramada el máximo de veces permitido (1 vez).",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+        
         if (!canReschedule()) {
             if (!isClosestAppointment()) {
                 Alert.alert(
@@ -247,6 +289,17 @@ export default function RescheduleScreen() {
 
     const performReschedule = async (date: string, time: string) => {
         if (!appointment) return;
+        
+        // Additional safety check for reschedule count
+        if ((appointment.rescheduleCount || 0) >= 1) {
+            Alert.alert(
+                "No se puede reprogramar",
+                "Esta cita ya ha sido reprogramada el máximo de veces permitido (1 vez).",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+        
         try {
             setIsSubmitting(true);
             const backendDate = convertDateToBackendFormat(date);
@@ -269,9 +322,20 @@ export default function RescheduleScreen() {
                     ]
                 );
             } else {
+                // Handle specific error cases
+                let errorMessage = response.error || "No se pudo reprogramar la cita. Por favor, intenta nuevamente.";
+                
+                if (response.error?.includes('Maximum reschedule limit reached')) {
+                    errorMessage = "Esta cita ya ha sido reprogramada el máximo de veces permitido (1 vez).";
+                } else if (response.error?.includes('30 minutos antes')) {
+                    errorMessage = "No se puede reprogramar una cita 30 minutos antes de la hora programada.";
+                } else if (response.error?.includes('not available')) {
+                    errorMessage = "El horario seleccionado no está disponible. Por favor, elige otro horario.";
+                }
+                
                 Alert.alert(
                     "Error al Reprogramar",
-                    response.error || "No se pudo reprogramar la cita. Por favor, intenta nuevamente.",
+                    errorMessage,
                     [{ text: "OK" }]
                 );
             }
@@ -432,7 +496,7 @@ export default function RescheduleScreen() {
                         </View>
                     </View>
                     {/* Reschedule Button */}
-                    {canReschedule() && !isRescheduling && (
+                    {canReschedule() && !isRescheduling && (appointment.rescheduleCount || 0) < 1 && (
                         <View style={styles.section}>
                             <Button onPress={handleReschedule}>
                                 Reprogramar Cita

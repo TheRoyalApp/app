@@ -469,8 +469,20 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       return res;
     }
 
+    // Debug logging
+    console.log('🔍 RESCHEDULE DEBUG:', {
+      appointmentId: id,
+      currentRescheduleCount: existingAppointment[0]?.rescheduleCount,
+      status: existingAppointment[0]?.status,
+      appointmentDate: existingAppointment[0]?.appointmentDate
+    });
+
     // Check reschedule limit (max 1 time)
     if (existingAppointment[0] && existingAppointment[0].rescheduleCount >= 1) {
+      console.log('❌ RESCHEDULE LIMIT REACHED:', {
+        appointmentId: id,
+        rescheduleCount: existingAppointment[0].rescheduleCount
+      });
       res.error = 'Maximum reschedule limit reached (1 time)';
       return res;
     }
@@ -482,6 +494,10 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
     const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
     
     if (timeDifferenceMinutes <= 30) {
+      console.log('❌ WITHIN 30 MINUTES:', {
+        appointmentId: id,
+        timeDifferenceMinutes
+      });
       res.error = 'No se puede reprogramar una cita 30 minutos antes de la hora programada';
       return res;
     }
@@ -512,12 +528,21 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
     }
 
     // Update appointment
+    const newRescheduleCount = (existingAppointment[0]?.rescheduleCount || 0) + 1;
+    console.log('✅ PROCEEDING WITH RESCHEDULE:', {
+      appointmentId: id,
+      oldRescheduleCount: existingAppointment[0]?.rescheduleCount,
+      newRescheduleCount,
+      newDate,
+      newTimeSlot: normalizedTimeSlot
+    });
+
     const updatedAppointment = await db
       .update(appointments)
       .set({
         appointmentDate: targetDate,
         timeSlot: normalizedTimeSlot as TimeSlot,
-        rescheduleCount: (existingAppointment[0]?.rescheduleCount || 0) + 1,
+        rescheduleCount: newRescheduleCount,
         updatedAt: new Date()
       })
       .where(eq(appointments.id, id))
@@ -527,6 +552,11 @@ export async function rescheduleAppointment(id: string, newDate: string, newTime
       res.error = 'Failed to reschedule appointment';
       return res;
     }
+
+    console.log('✅ RESCHEDULE SUCCESSFUL:', {
+      appointmentId: id,
+      newRescheduleCount: updatedAppointment[0].rescheduleCount
+    });
 
     res.data = updatedAppointment[0] ? updatedAppointment[0] as any : null;
     return res;
