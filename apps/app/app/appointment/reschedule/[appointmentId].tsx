@@ -118,6 +118,11 @@ export default function RescheduleScreen() {
     };
 
     const getClosestUpcomingAppointment = (): Appointment | null => {
+        // Ensure allUserAppointments is an array before filtering
+        if (!allUserAppointments || !Array.isArray(allUserAppointments)) {
+            return null;
+        }
+
         const now = new Date();
         const upcomingAppointments = allUserAppointments.filter(apt => {
             const aptDate = new Date(apt.appointmentDate);

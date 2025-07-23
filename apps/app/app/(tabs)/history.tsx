@@ -52,6 +52,11 @@ export default function HistoryScreen() {
 	};
 
 	const getUpcomingAppointments = (): Appointment[] => {
+		// Ensure appointments is an array before filtering
+		if (!appointments || !Array.isArray(appointments)) {
+			return [];
+		}
+
 		const now = new Date();
 		const upcomingAppointments = appointments.filter(apt => {
 			const aptDate = new Date(apt.appointmentDate);
@@ -67,6 +72,11 @@ export default function HistoryScreen() {
 	};
 
 	const getPastAppointments = (): Appointment[] => {
+		// Ensure appointments is an array before filtering
+		if (!appointments || !Array.isArray(appointments)) {
+			return [];
+		}
+
 		const now = new Date();
 		const pastAppointments = appointments.filter(apt => {
 			const aptDate = new Date(apt.appointmentDate);

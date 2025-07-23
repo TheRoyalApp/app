@@ -75,12 +75,17 @@ export default function AppointmentDatePicker({
         const endOfDay = new Date(selectedDateObj);
         endOfDay.setHours(23, 59, 59, 999);
         
-        const appointmentsForSelectedDate = allDebugResponse.data.appointments.filter((apt: any) => {
-          const aptDate = new Date(apt.appointmentDate);
-          return aptDate >= startOfDay && aptDate <= endOfDay;
-        });
-        
-        setDebugAppointments(appointmentsForSelectedDate);
+        // Ensure appointments is an array before filtering
+        if (allDebugResponse.data?.appointments && Array.isArray(allDebugResponse.data.appointments)) {
+          const appointmentsForSelectedDate = allDebugResponse.data.appointments.filter((apt: any) => {
+            const aptDate = new Date(apt.appointmentDate);
+            return aptDate >= startOfDay && aptDate <= endOfDay;
+          });
+          
+          setDebugAppointments(appointmentsForSelectedDate);
+        } else {
+          setDebugAppointments([]);
+        }
       }
     } catch (error) {
       // Error handling silently

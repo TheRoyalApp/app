@@ -133,11 +133,28 @@ export class AppointmentsService {
         }
       }
       
-      return await apiClient.get<Appointment[]>(endpoint);
+      const response = await apiClient.get<Appointment[]>(endpoint);
+      
+      // Ensure response has proper structure
+      if (response && typeof response === 'object') {
+        return {
+          success: response.success || false,
+          data: Array.isArray(response.data) ? response.data : [],
+          error: response.error,
+          message: response.message
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Invalid response format',
+        data: []
+      };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch appointments',
+        data: []
       };
     }
   }
@@ -249,11 +266,28 @@ export class AppointmentsService {
   // Get all appointments (admin only)
   static async getAllAppointments(): Promise<ApiResponse<Appointment[]>> {
     try {
-      return await apiClient.get<Appointment[]>('/appointments/all');
+      const response = await apiClient.get<Appointment[]>('/appointments/all');
+      
+      // Ensure response has proper structure
+      if (response && typeof response === 'object') {
+        return {
+          success: response.success || false,
+          data: Array.isArray(response.data) ? response.data : [],
+          error: response.error,
+          message: response.message
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Invalid response format',
+        data: []
+      };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch all appointments',
+        data: []
       };
     }
   }
@@ -261,11 +295,28 @@ export class AppointmentsService {
   // Get all appointments for a specific barber (staff)
   static async getBarberAppointments(barberId: string): Promise<ApiResponse<Appointment[]>> {
     try {
-      return await apiClient.get<Appointment[]>(`/appointments/barber/${barberId}`);
+      const response = await apiClient.get<Appointment[]>(`/appointments/barber/${barberId}`);
+      
+      // Ensure response has proper structure
+      if (response && typeof response === 'object') {
+        return {
+          success: response.success || false,
+          data: Array.isArray(response.data) ? response.data : [],
+          error: response.error,
+          message: response.message
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Invalid response format',
+        data: []
+      };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch barber appointments',
+        data: []
       };
     }
   }

@@ -41,6 +41,16 @@ const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'availability' | 'users'>('appointments');
   const [refreshing, setRefreshing] = useState(false);
   const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
+  
+  // Safe setter for appointments that ensures it's always an array
+  const setAppointmentsSafe = (appointmentsData: ApiAppointment[] | null | undefined) => {
+    if (Array.isArray(appointmentsData)) {
+      setAppointments(appointmentsData);
+    } else {
+      console.log('setAppointmentsSafe: Invalid data provided, setting empty array');
+      setAppointments([]);
+    }
+  };
   const [services, setServices] = useState<ApiService[]>([]);
   const [schedules, setSchedules] = useState<BarberSchedule[]>([]);
   const [showAvailabilityEditor, setShowAvailabilityEditor] = useState(false);
@@ -75,18 +85,25 @@ const AdminPanel = () => {
   const [searchedUser, setSearchedUser] = useState<any>(null);
   const [isSearchingUser, setIsSearchingUser] = useState(false);
   const [isUpdatingUserRole, setIsUpdatingUserRole] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Arrays de días para la API y la UI
   // Backend uses: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+  // Set mounted state
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
   // Fetch appointments, services, and schedules from API
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && isMounted) {
       fetchAllData();
     }
-  }, [user, isLoading, activeTab]);
+  }, [user, isLoading, activeTab, isMounted]);
 
   // Force refresh when tab changes
   useEffect(() => {
@@ -114,6 +131,11 @@ const AdminPanel = () => {
 
   useEffect(() => {
     const fetchMissingBarberNames = async () => {
+      // Ensure schedules is an array before filtering
+      if (!schedules || !Array.isArray(schedules)) {
+        return;
+      }
+
       const missingIds = schedules
         .filter(s => !s.barber?.name && !barberNames[s.barberId])
         .map(s => s.barberId);
@@ -144,6 +166,21 @@ const AdminPanel = () => {
   }, [schedules]);
 
   const applyFilters = () => {
+    // Only apply filters if component is mounted
+    if (!isMounted) {
+      console.log('applyFilters: Component not mounted, skipping');
+      return;
+    }
+    
+    // Ensure appointments is an array before filtering
+    if (!appointments || !Array.isArray(appointments)) {
+      console.log('applyFilters: appointments is not an array, setting empty filtered appointments');
+      console.log('appointments type:', typeof appointments);
+      console.log('appointments value:', appointments);
+      setFilteredAppointments([]);
+      return;
+    }
+
     let filtered = appointments;
 
     // Filter by status
@@ -183,8 +220,23 @@ const AdminPanel = () => {
 
   // Apply filters whenever appointments or filter values change
   useEffect(() => {
-    applyFilters();
-  }, [appointments, statusFilter, dateFilter, barberFilter]);
+    if (!isMounted) return;
+    
+    console.log('applyFilters useEffect triggered:', {
+      appointmentsLength: appointments?.length || 0,
+      isArray: Array.isArray(appointments),
+      statusFilter,
+      dateFilter,
+      barberFilter
+    });
+    
+    // Add a small delay to ensure appointments are properly set
+    const timeoutId = setTimeout(() => {
+      applyFilters();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [appointments, statusFilter, dateFilter, barberFilter, isMounted]);
 
   const searchUserByEmail = async () => {
     if (!userSearchEmail.trim()) {
@@ -251,45 +303,50 @@ const AdminPanel = () => {
           console.log('Appointments response success:', res.success);
           console.log('Appointments data length:', res.data?.length || 0);
           
-          if (res && res.success && res.data) {
+          if (res && res.success && res.data && Array.isArray(res.data)) {
             const allAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
             console.log('Filtered appointments (excluding completed):', allAppointments.length);
-            setAppointments(allAppointments);
+            setAppointmentsSafe(allAppointments);
             setTotalAppointments(allAppointments.length);
             setAppointmentsLoaded(allAppointments.length);
           } else {
             console.log('No appointments data or API failed');
-            setAppointments([]);
+            console.log('Response structure:', { success: res?.success, hasData: !!res?.data, isArray: Array.isArray(res?.data) });
+            setAppointmentsSafe([]);
             setTotalAppointments(0);
           }
         } else if (user.role === 'staff') {
           // Staff sees only their own appointments
           const res = await AppointmentsService.getBarberAppointments(user.id);
           console.log('Fetched barber appointments for staff:', res);
-          if (res && res.success && res.data) {
+          if (res && res.success && res.data && Array.isArray(res.data)) {
             const filteredAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
             console.log('Staff appointments (excluding completed):', filteredAppointments.length);
-            setAppointments(filteredAppointments);
+            setAppointmentsSafe(filteredAppointments);
           } else {
             console.log('No staff appointments data');
-            setAppointments([]);
+            console.log('Response structure:', { success: res?.success, hasData: !!res?.data, isArray: Array.isArray(res?.data) });
+            setAppointmentsSafe([]);
           }
         } else {
           // Regular users see only their own appointments
           const res = await AppointmentsService.getUserAppointments();
           console.log('Fetched user appointments:', res);
-          if (res && res.success && res.data) {
+          if (res && res.success && res.data && Array.isArray(res.data)) {
             const filteredAppointments = res.data.filter((apt: any) => apt.status !== 'completed');
             console.log('User appointments (excluding completed):', filteredAppointments.length);
-            setAppointments(filteredAppointments);
+            setAppointmentsSafe(filteredAppointments);
           } else {
             console.log('No user appointments data');
-            setAppointments([]);
+            console.log('Response structure:', { success: res?.success, hasData: !!res?.data, isArray: Array.isArray(res?.data) });
+            setAppointmentsSafe([]);
           }
         }
       } catch (error) {
         console.error('Error loading appointments:', error);
-        setAppointments([]);
+        setAppointmentsSafe([]);
+        setTotalAppointments(0);
+        setAppointmentsLoaded(0);
       } finally {
         setIsLoadingAppointments(false);
         console.log('Appointments loading completed');
