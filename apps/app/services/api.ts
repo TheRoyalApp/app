@@ -67,11 +67,16 @@ class ApiClient {
       // Test connectivity only in development
       if (__DEV__) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
           const testResponse = await fetch(`${this.baseURL}/health`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(3000) // Reduced timeout
+            signal: controller.signal
           });
+          
+          clearTimeout(timeoutId);
           console.log('API Client: Connectivity test result:', testResponse.status);
         } catch (error) {
           console.warn('API Client: Connectivity test failed:', error);

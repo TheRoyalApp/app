@@ -17,11 +17,16 @@ export async function initializeDatabase() {
     }
 
     try {
-        // Create the connection
+        // Create the connection with better timeout handling
         const client = postgres(connectionString, {
             max: 10, // Maximum number of connections
             idle_timeout: 20, // Close idle connections after 20 seconds
             connect_timeout: 10, // Connection timeout
+            connection: {
+                application_name: 'the_royal_barber_api'
+            },
+            onnotice: () => {}, // Suppress notice messages
+            onparameter: () => {}, // Suppress parameter messages
         });
 
         // Create the database instance

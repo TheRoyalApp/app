@@ -207,13 +207,18 @@ export default function AppointmentScreen() {
 	const testNetworkConnectivity = async () => {
 		try {
 			console.log('🌐 Testing network connectivity to:', API_CONFIG.baseURL);
-			const response = await fetch(`${API_CONFIG.baseURL}/health`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				signal: AbortSignal.timeout(3000), // Reduced timeout
-			});
+					const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 3000);
+		
+		const response = await fetch(`${API_CONFIG.baseURL}/health`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			signal: controller.signal,
+		});
+		
+		clearTimeout(timeoutId);
 			console.log('✅ Network connectivity test successful:', response.status);
 			return true;
 		} catch (error) {
