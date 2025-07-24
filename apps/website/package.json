@@ -4,10 +4,17 @@
   "description": "Official website for The Royal Barber app",
   "main": "index.html",
   "scripts": {
-    "start": "serve -s . -p $PORT",
-    "dev": "serve -s . -p 3000",
+    "## Development ##": "",
+    "start": "node server.js",
+    "dev": "node server.js",
+    
+    "## Build ##": "",
     "build": "echo 'Static site - no build required'",
-    "test": "echo 'No tests specified'"
+    
+    "## Testing ##": "",
+    "test": "echo 'No tests specified for static website'",
+    "test:lint": "echo 'No linting configured for static website'",
+    "test:validate": "echo 'HTML validation not configured'"
   },
   "keywords": [
     "barber",
@@ -18,7 +25,9 @@
   "author": "The Royal Barber",
   "license": "MIT",
   "dependencies": {
-    "serve": "^14.2.1"
+    "serve": "^14.2.1",
+    "hono": "^4.7.9",
+    "@hono/node-server": "^1.14.4"
   },
   "engines": {
     "node": ">=18.0.0"

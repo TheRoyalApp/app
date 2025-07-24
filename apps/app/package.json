@@ -3,11 +3,24 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "## Development ##": "",
     "start": "expo start",
+    "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest --watchAll"
+    
+    "## Build ##": "",
+    "build": "expo build",
+    "build:android": "expo build:android",
+    "build:ios": "expo build:ios",
+    "build:web": "expo build:web",
+    
+    "## Testing ##": "",
+    "test": "jest --watchAll",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "jest": {
     "preset": "jest-expo"
