@@ -28,7 +28,7 @@ export {
 
 export const unstable_settings = {
 	// Ensure that reloading on `/modal` keeps a back button present.
-	initialRouteName: 'auth/welcome',
+	// Removed initialRouteName to let the navigation logic handle routing
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

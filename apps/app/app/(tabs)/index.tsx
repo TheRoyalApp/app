@@ -16,7 +16,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { AppointmentsService, Appointment } from '@/services';
 
 export default function HomeScreen() {
-	const { user, clearStorage } = useAuth();
+	const { user, clearStorage, isLoading: authLoading } = useAuth();
 	const [upcomingAppointment, setUpcomingAppointment] = useState<Appointment | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
@@ -24,6 +24,18 @@ export default function HomeScreen() {
 	const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
 	const [hasShownAlert, setHasShownAlert] = useState(false);
 
+	// Redirect unauthenticated users to welcome page
+	useEffect(() => {
+		if (!authLoading && !user) {
+			console.log('HomeScreen: No user detected, redirecting to welcome');
+			router.replace('/auth/welcome');
+		}
+	}, [user, authLoading]);
+
+	// Don't render if user is not authenticated
+	if (authLoading || !user) {
+		return null;
+	}
 
 
 	// Effect to handle initial load and user state changes

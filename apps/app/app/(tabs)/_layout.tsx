@@ -1,9 +1,9 @@
 // React core imports
-import React from 'react';
+import React, { useEffect } from 'react';
 
 // Third-party library imports
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Stack, Tabs } from 'expo-router';
+import { Stack, Tabs, router } from 'expo-router';
 
 // Local imports
 import Colors from '@/constants/Colors';
@@ -17,7 +17,20 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
-	const { user } = useAuth();
+	const { user, isLoading } = useAuth();
+	
+	// Redirect unauthenticated users to welcome page
+	useEffect(() => {
+		if (!isLoading && !user) {
+			console.log('TabLayout: No user detected, redirecting to welcome');
+			router.replace('/auth/welcome');
+		}
+	}, [user, isLoading]);
+	
+	// Don't render tabs if user is not authenticated
+	if (isLoading || !user) {
+		return null;
+	}
 	
 	return (
 		<Tabs
