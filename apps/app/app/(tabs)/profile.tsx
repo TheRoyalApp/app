@@ -263,6 +263,9 @@ export default function ProfileScreen() {
 										<ThemeText style={styles.helperText}>
 											Incluye el código de país, por ejemplo: +1 234 567 8900
 										</ThemeText>
+										<ThemeText style={styles.notificationText}>
+											📱 Este número se usa para enviarte notificaciones sobre tus citas
+										</ThemeText>
 										{userData.phone.length > 0 && !isValidPhoneNumber(userData.phone) && (
 											<ThemeText style={styles.warningText}>
 												Formato inválido. Usa el formato internacional: +1 234 567 8900
@@ -734,5 +737,12 @@ const styles = StyleSheet.create({
 		color: '#ff3b30',
 		marginTop: 2,
 		marginLeft: 2,
+	},
+	notificationText: {
+		fontSize: 12,
+		color: Colors.dark.primary,
+		marginTop: 4,
+		marginLeft: 2,
+		fontStyle: 'italic',
 	},
 });

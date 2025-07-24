@@ -137,6 +137,9 @@ export default function SignUpScreen() {
                   <Text style={styles.helperText}>
                     Incluye el código de país, por ejemplo: +1 234 567 8900
                   </Text>
+                  <Text style={styles.notificationText}>
+                    📱 Este número se usará para enviarte notificaciones sobre tus citas
+                  </Text>
                   {phone.length > 0 && !isValidPhoneNumber(phone) && (
                     <Text style={styles.warningText}>
                       Formato inválido. Usa el formato internacional: +1 234 567 8900
@@ -332,5 +335,12 @@ const styles = StyleSheet.create({
     color: '#ff3b30',
     marginTop: 2,
     marginLeft: 2,
+  },
+  notificationText: {
+    fontSize: 12,
+    color: Colors.dark.primary,
+    marginTop: 4,
+    marginLeft: 2,
+    fontStyle: 'italic',
   },
 }); 
