@@ -12,7 +12,9 @@
 			},
 			"eas": {
 				"projectId": "your-project-id"
-			}
+			},
+			"privacyPolicyUrl": "https://theroyalbarber.com/privacy",
+			"termsOfServiceUrl": "https://theroyalbarber.com/terms"
 		},
 		"userInterfaceStyle": "dark",
 		"newArchEnabled": true,

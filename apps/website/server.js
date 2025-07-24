@@ -30,6 +30,16 @@ app.get('/privacy', (c) => {
   }
 });
 
+// Specific route for terms page
+app.get('/terms', (c) => {
+  try {
+    const termsContent = readFileSync(join(process.cwd(), 'terms.html'), 'utf-8');
+    return c.html(termsContent);
+  } catch (error) {
+    return c.html('<h1>Terms page not found</h1>', 404);
+  }
+});
+
 // Serve all other static files
 app.use('*', serveStatic({ root: './' }));
 

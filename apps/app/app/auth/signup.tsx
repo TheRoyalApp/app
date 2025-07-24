@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -197,6 +198,26 @@ export default function SignUpScreen() {
                   </Text>
                 </TouchableOpacity>
 
+                {/* Legal Links */}
+                <View style={styles.legalContainer}>
+                  <Text style={styles.legalText}>
+                    Al crear una cuenta, aceptas nuestros{' '}
+                    <Text 
+                      style={styles.legalLink}
+                      onPress={() => Linking.openURL('https://theroyalbarber.com/terms')}
+                    >
+                      Términos de Servicio
+                    </Text>
+                    {' '}y{' '}
+                    <Text 
+                      style={styles.legalLink}
+                      onPress={() => Linking.openURL('https://theroyalbarber.com/privacy')}
+                    >
+                      Política de Privacidad
+                    </Text>
+                  </Text>
+                </View>
+
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>o</Text>
@@ -342,5 +363,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 2,
     fontStyle: 'italic',
+  },
+  legalContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+  },
+  legalText: {
+    fontSize: 11,
+    color: Colors.dark.textLight,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  legalLink: {
+    color: Colors.dark.primary,
+    textDecorationLine: 'underline',
   },
 }); 

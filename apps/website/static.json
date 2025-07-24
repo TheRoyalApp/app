@@ -23,6 +23,7 @@
   },
   "routes": {
     "/privacy": "privacy.html",
+    "/terms": "terms.html",
     "/**": "index.html"
   }
 } 

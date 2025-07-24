@@ -10,6 +10,7 @@ import {
 	Alert,
 	Modal,
 	Switch,
+	Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -314,6 +315,66 @@ export default function ProfileScreen() {
 									<ThemeText style={styles.menuTitle}>Cerrar Sesión</ThemeText>
 									<ThemeText style={styles.menuSubtitle}>
 										Salir de tu cuenta
+									</ThemeText>
+								</View>
+							</View>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={Colors.dark.textLight}
+							/>
+						</TouchableOpacity>
+					</View>
+
+					{/* Legal Links Card */}
+					<View style={styles.settingsCard}>
+						<View style={styles.cardHeader}>
+							<Ionicons name="document-text" size={24} color={Colors.dark.primary} />
+							<ThemeText style={styles.cardTitle}>Legal</ThemeText>
+						</View>
+
+						<TouchableOpacity
+							style={styles.menuItem}
+							onPress={() => Linking.openURL('https://theroyalbarber.com/privacy')}
+						>
+							<View style={styles.menuItemLeft}>
+								<View style={[styles.menuIcon, { backgroundColor: '#007AFF' }]}>
+									<Ionicons
+										name="shield-checkmark"
+										size={20}
+										color={Colors.dark.background}
+									/>
+								</View>
+								<View style={styles.menuText}>
+									<ThemeText style={styles.menuTitle}>Política de Privacidad</ThemeText>
+									<ThemeText style={styles.menuSubtitle}>
+										Cómo protegemos tu información
+									</ThemeText>
+								</View>
+							</View>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={Colors.dark.textLight}
+							/>
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={styles.menuItem}
+							onPress={() => Linking.openURL('https://theroyalbarber.com/terms')}
+						>
+							<View style={styles.menuItemLeft}>
+								<View style={[styles.menuIcon, { backgroundColor: '#34C759' }]}>
+									<Ionicons
+										name="document-text"
+										size={20}
+										color={Colors.dark.background}
+									/>
+								</View>
+								<View style={styles.menuText}>
+									<ThemeText style={styles.menuTitle}>Términos de Servicio</ThemeText>
+									<ThemeText style={styles.menuSubtitle}>
+										Condiciones de uso de la app
 									</ThemeText>
 								</View>
 							</View>
