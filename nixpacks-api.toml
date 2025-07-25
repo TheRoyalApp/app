@@ -1,0 +1,11 @@
+[variables]
+NIXPACKS_PATH = "apps/api"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "bun"]
+
+[phases.install]
+cmds = ["cd apps/api && bun install"]
+
+[start]
+cmd = "cd apps/api && bun run src/index.ts" 

@@ -1,0 +1,14 @@
+[variables]
+NIXPACKS_PATH = "apps/website"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.install]
+cmds = ["cd apps/website && npm install"]
+
+[phases.build]
+cmds = ["cd apps/website && npm run build || echo 'No build script'"]
+
+[start]
+cmd = "cd apps/website && npm start" 

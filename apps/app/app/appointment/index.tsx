@@ -371,12 +371,16 @@ export default function AppointmentScreen() {
 			const dateObj = new Date(selectedDate);
 			const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 			
-			// Create checkout session data with detailed URLs
-			// Use proper URL encoding to handle special characters
+			// Create checkout session data with multiple URL schemes for better compatibility
+			// Primary URLs with proper encoding
 			const successUrl = `app://payment/success?status=success&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}`;
 			const cancelUrl = `app://payment/failed?status=cancel&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}&errorMessage=${encodeURIComponent('Pago cancelado por el usuario')}`;
 			
-			// Also create simplified URLs as fallback for embedded browser issues
+			// Alternative scheme URLs for better compatibility
+			const altSuccessUrl = `theroyalbarber://payment/success?status=success&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}`;
+			const altCancelUrl = `theroyalbarber://payment/failed?status=cancel&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}&errorMessage=${encodeURIComponent('Pago cancelado por el usuario')}`;
+			
+			// Simplified URLs for embedded browser compatibility
 			const simpleSuccessUrl = `app://payment/success?status=success&timeSlot=${selectedTime}&appointmentDate=${formattedDate}&serviceName=${selectedService.name}&barberName=${selectedBarber.name}&amount=${selectedService.price}`;
 			const simpleCancelUrl = `app://payment/failed?status=cancel&timeSlot=${selectedTime}&appointmentDate=${formattedDate}&serviceName=${selectedService.name}&barberName=${selectedBarber.name}&amount=${selectedService.price}&errorMessage=Pago cancelado por el usuario`;
 			
@@ -385,15 +389,20 @@ export default function AppointmentScreen() {
 			const embeddedSuccessUrl = `app://payment/success?status=success&timeSlot=${selectedTime}&appointmentDate=${formattedDate}&serviceName=${selectedService.name.replace(/[^a-zA-Z0-9\s]/g, '')}&barberName=${selectedBarber.name.replace(/[^a-zA-Z0-9\s]/g, '')}&amount=${selectedService.price}`;
 			const embeddedCancelUrl = `app://payment/failed?status=cancel&timeSlot=${selectedTime}&appointmentDate=${formattedDate}&serviceName=${selectedService.name.replace(/[^a-zA-Z0-9\s]/g, '')}&barberName=${selectedBarber.name.replace(/[^a-zA-Z0-9\s]/g, '')}&amount=${selectedService.price}&errorMessage=Pago cancelado por el usuario`;
 			
-			console.log('Using embedded browser compatible URLs');
-			console.log('Success URL (embedded):', embeddedSuccessUrl);
-			console.log('Cancel URL (embedded):', embeddedCancelUrl);
+			console.log('🔗 Payment URLs created:');
+			console.log('Primary Success URL:', successUrl);
+			console.log('Alternative Success URL:', altSuccessUrl);
+			console.log('Primary Cancel URL:', cancelUrl);
+			console.log('Alternative Cancel URL:', altCancelUrl);
+			console.log('Embedded Success URL:', embeddedSuccessUrl);
+			console.log('Embedded Cancel URL:', embeddedCancelUrl);
 			
+			// Use the primary URLs for better compatibility
 			const checkoutData = {
 				serviceId: selectedService.id,
 				paymentType: paymentType,
-				successUrl: embeddedSuccessUrl,
-				cancelUrl: embeddedCancelUrl,
+				successUrl: successUrl, // Use primary URL with proper encoding
+				cancelUrl: cancelUrl,   // Use primary URL with proper encoding
 				userId: user.id,
 				appointmentData: {
 					barberId: selectedBarber.id,
@@ -403,9 +412,7 @@ export default function AppointmentScreen() {
 				}
 			};
 
-			console.log('Creating checkout session with data:', checkoutData);
-			console.log('Success URL:', successUrl);
-			console.log('Cancel URL:', cancelUrl);
+			console.log('💳 Creating checkout session with data:', checkoutData);
 			
 			// Set up payment callback expectation
 			if ((global as any).expectPaymentCallback) {
@@ -466,6 +473,7 @@ export default function AppointmentScreen() {
 				
 				// Handle the browser result
 				if (result.type === 'cancel') {
+					console.log('❌ Payment cancelled by user');
 					// Navigate to failed screen when user cancels
 					setPaymentCancelled(true); // Mark payment as cancelled
 					
@@ -515,22 +523,21 @@ export default function AppointmentScreen() {
 						);
 					}
 				} else if (result.type === 'dismiss') {
-					// User closed the browser - check if payment was successful
-					console.log('Payment browser dismissed - checking payment status');
+					console.log('🔍 Payment browser dismissed - checking payment status');
 					
 					// Wait a moment for any pending deep link events
 					setTimeout(() => {
-						// If no deep link was received, show a success message
-						// This handles the case where the embedded browser couldn't open the deep link
-						console.log('No deep link received after browser dismissal - showing success message');
+						console.log('⏰ Checking for deep link events after browser dismissal');
 						
 						// Only show success message if payment wasn't cancelled
 						if (!paymentCancelled) {
 							// Check if we have a global failure handler
 							if ((global as any).handleEmbeddedBrowserFailure && !alertShown) {
+								console.log('🔄 Using global embedded browser failure handler');
 								setAlertShown(true);
 								(global as any).handleEmbeddedBrowserFailure();
 							} else if (!alertShown) {
+								console.log('🔄 Using local fallback alert');
 								// Fallback to local alert
 								setAlertShown(true);
 								WebBrowser.dismissBrowser();
@@ -549,24 +556,27 @@ export default function AppointmentScreen() {
 									]
 								);
 							}
+						} else {
+							console.log('❌ Payment was cancelled, not showing success message');
 						}
-					}, 1500); // Reduced wait time for faster response
+					}, 3000); // Wait 3 seconds for deep link
 				} else {
 					// Handle any other browser result types (like Safari errors)
-					console.log('Browser returned unexpected result type:', result.type);
+					console.log('🔍 Browser returned result type:', result.type);
 					
-					// Wait a moment for any pending deep link events
+					// For any other result type, wait for deep link events
 					setTimeout(() => {
-						// If no deep link was received, show a success message
-						console.log('No deep link received after unexpected browser result - showing success message');
+						console.log('⏰ Checking for deep link events after browser result');
 						
 						// Only show success message if payment wasn't cancelled
 						if (!paymentCancelled) {
 							// Check if we have a global failure handler
 							if ((global as any).handleEmbeddedBrowserFailure && !alertShown) {
+								console.log('🔄 Using global embedded browser failure handler');
 								setAlertShown(true);
 								(global as any).handleEmbeddedBrowserFailure();
 							} else if (!alertShown) {
+								console.log('🔄 Using local fallback alert');
 								// Fallback to local alert
 								setAlertShown(true);
 								WebBrowser.dismissBrowser();
@@ -585,8 +595,10 @@ export default function AppointmentScreen() {
 									]
 								);
 							}
+						} else {
+							console.log('❌ Payment was cancelled, not showing success message');
 						}
-					}, 1500);
+					}, 3000); // Wait 3 seconds for deep link
 				}
 			} else {
 				Alert.alert('Error', response.error || 'Failed to create payment session');

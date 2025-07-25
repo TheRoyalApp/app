@@ -71,9 +71,13 @@ function RootLayoutNav() {
 		let paymentCancelled = false; // Global flag to track if payment was cancelled
 
 		const handleUrl = (url: string) => {
+			console.log('🔗 Global URL handler received:', url);
+			
+			// Normalize URL to handle both schemes
+			const normalizedUrl = url.replace('theroyalbarber://', 'app://');
 			
 			// Only clear payment callback timeout if this is a payment-related deep link
-			if (url.includes('app://payment/') || url.includes('app://payment-callback')) {
+			if (normalizedUrl.includes('app://payment/') || normalizedUrl.includes('app://payment-callback')) {
 				// Clear any pending payment callback timeout
 				if (paymentCallbackTimeout) {
 					clearTimeout(paymentCallbackTimeout);
@@ -88,8 +92,8 @@ function RootLayoutNav() {
 				paymentCancelled = false; // Reset payment cancelled flag when payment deep link is received
 			}
 			
-			// Handle payment success URLs
-			if (url.includes('app://payment/success')) {
+			// Handle payment success URLs (both schemes)
+			if (normalizedUrl.includes('app://payment/success')) {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
@@ -195,8 +199,8 @@ function RootLayoutNav() {
 					}
 				}
 			}
-			// Handle payment failure URLs
-			else if (url.includes('app://payment/failed')) {
+			// Handle payment failure URLs (both schemes)
+			else if (normalizedUrl.includes('app://payment/failed')) {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
@@ -295,8 +299,8 @@ function RootLayoutNav() {
 					);
 				}
 			}
-			// Handle legacy payment-callback URLs for backward compatibility
-			else if (url.includes('app://payment-callback')) {
+			// Handle legacy payment-callback URLs for backward compatibility (both schemes)
+			else if (normalizedUrl.includes('app://payment-callback')) {
 				// Close any open WebBrowser session
 				WebBrowser.dismissBrowser();
 				
@@ -460,22 +464,40 @@ function RootLayoutNav() {
 			}
 		});
 
-		// Add fallback for Safari deep link issues
-		const checkSafariDeepLink = async () => {
+		// Enhanced deep link availability check
+		const checkDeepLinkAvailability = async () => {
 			try {
-				const canOpen = await Linking.canOpenURL('app://payment/success');
-				console.log('🔗 Can open deep link:', canOpen);
+				const testUrls = [
+					'app://payment/success',
+					'theroyalbarber://payment/success',
+					'app://payment/failed',
+					'theroyalbarber://payment/failed'
+				];
 				
-				if (!canOpen) {
-					console.warn('⚠️ Deep link not available - Safari may show "path cannot be found"');
+				for (const url of testUrls) {
+					try {
+						const canOpen = await Linking.canOpenURL(url);
+						console.log(`🔗 Can open deep link ${url}:`, canOpen);
+						
+						if (canOpen) {
+							console.log('✅ Deep link is available and working');
+							return true;
+						}
+					} catch (error) {
+						console.warn(`⚠️ Error checking ${url}:`, error);
+					}
 				}
+				
+				console.warn('⚠️ No deep links are available - this may cause Safari issues');
+				return false;
 			} catch (error) {
 				console.error('❌ Error checking deep link availability:', error);
+				return false;
 			}
 		};
 
 		// Check deep link availability after a delay
-		setTimeout(checkSafariDeepLink, 2000);
+		setTimeout(checkDeepLinkAvailability, 2000);
 
 		// Add monitoring for embedded browser failures
 		const monitorEmbeddedBrowserFailure = () => {

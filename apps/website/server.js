@@ -15,6 +15,17 @@ app.use('*', async (c, next) => {
   await next();
 });
 
+// Health check endpoint for Railway deployment
+app.get('/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'production',
+    service: 'website'
+  });
+});
+
 // Serve static assets with caching
 app.use('/assets/*', serveStatic({ root: './', headers: { 'Cache-Control': 'public, max-age=31536000' } }));
 app.use('*.css', serveStatic({ root: './', headers: { 'Cache-Control': 'public, max-age=31536000' } }));
@@ -64,7 +75,9 @@ console.log(`   │   - Network:  http://0.0.0.0:${port}         │`);
 console.log(`   │                                           │`);
 console.log(`   │   Routes:                                  │`);
 console.log(`   │   - /         → index.html                │`);
+console.log(`   │   - /health   → health endpoint           │`);
 console.log(`   │   - /privacy  → privacy.html              │`);
+console.log(`   │   - /terms    → terms.html                │`);
 console.log(`   │   - /*        → index.html (SPA)          │`);
 console.log(`   │                                           │`);
 console.log(`   └───────────────────────────────────────────┘\n`);

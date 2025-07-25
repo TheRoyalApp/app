@@ -1,0 +1,14 @@
+[variables]
+NODE_ENV = "production"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.install]
+cmds = ["cd apps/website && npm install"]
+
+[phases.build]
+cmds = ["echo 'No build needed for static site'"]
+
+[start]
+cmd = "cd apps/website && npm start" 

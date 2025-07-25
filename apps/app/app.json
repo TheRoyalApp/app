@@ -26,6 +26,7 @@
 		"ios": {
 			"supportsTablet": false,
 			"bundleIdentifier": "com.theroyalbarber.app",
+			"buildNumber": "1",
 			"associatedDomains": [
 				"applinks:theroyalbarber.com"
 			],
@@ -33,10 +34,11 @@
 				"CFBundleURLTypes": [
 					{
 						"CFBundleURLName": "com.theroyalbarber.app",
-						"CFBundleURLSchemes": ["app"]
+						"CFBundleURLSchemes": ["app", "theroyalbarber"]
 					}
 				],
-				"LSApplicationQueriesSchemes": ["app"]
+				"LSApplicationQueriesSchemes": ["app", "theroyalbarber"],
+				"CFBundleAllowMixedLocalizations": true
 			}
 		},
 		"android": {
@@ -46,6 +48,7 @@
 			},
 			"edgeToEdgeEnabled": true,
 			"package": "com.theroyalbarber.app",
+			"versionCode": 1,
 			"intentFilters": [
 				{
 					"action": "VIEW",
@@ -62,7 +65,28 @@
 							"pathPrefix": "/failed"
 						},
 						{
+							"scheme": "theroyalbarber",
+							"host": "payment",
+							"pathPrefix": "/success"
+						},
+						{
+							"scheme": "theroyalbarber",
+							"host": "payment",
+							"pathPrefix": "/failed"
+						}
+					],
+					"category": ["BROWSABLE", "DEFAULT"]
+				},
+				{
+					"action": "VIEW",
+					"autoVerify": false,
+					"data": [
+						{
 							"scheme": "app",
+							"host": "payment-callback"
+						},
+						{
+							"scheme": "theroyalbarber",
 							"host": "payment-callback"
 						}
 					],
