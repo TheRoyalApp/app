@@ -61,7 +61,11 @@ export function createRateLimit(config: RateLimitConfig) {
         method: c.req.method,
         limit: config.max,
         windowMs: config.windowMs,
-        retryAfter
+        retryAfter,
+        userAgent: c.req.header('User-Agent'),
+        referer: c.req.header('Referer'),
+        currentCount: entry.count,
+        resetTime: new Date(entry.resetTime).toISOString()
       });
       
       return c.json(errorResponse(429, config.message || 'Too many requests', {
@@ -98,20 +102,20 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
   rateLimits = {
     // Strict limits for authentication endpoints
     auth: createRateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 5, // 5 requests per 15 minutes
+      windowMs: 60 * 1000, // 1 minute (changed from 15 minutes)
+      max: 500, // 500 requests per minute (changed from 15 per 15 minutes)
       message: 'Too many authentication attempts, please try again later'
     }),
     // Moderate limits for general API endpoints
     api: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 100, // 100 requests per minute
+      max: 200, // 200 requests per minute (increased from 100)
       message: 'Too many requests, please slow down'
     }),
     // Higher limits for authenticated users
     authenticated: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 200, // 200 requests per minute
+      max: 500, // 500 requests per minute (increased from 200)
       message: 'Too many requests, please slow down',
       keyGenerator: (c: any) => {
         // Use user ID if authenticated, otherwise use IP
@@ -122,7 +126,7 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
     // Specific limits for appointment booking
     appointments: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 10, // 10 appointment requests per minute
+      max: 30, // 30 appointment requests per minute (increased from 10)
       message: 'Too many appointment requests, please slow down',
       keyGenerator: (c: any) => {
         const user = c.get('user');
@@ -132,7 +136,7 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
     // Admin endpoints with higher limits
     admin: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 50, // 50 requests per minute
+      max: 100, // 100 requests per minute (increased from 50)
       message: 'Too many admin requests, please slow down',
       keyGenerator: (c: any) => {
         const user = c.get('user');
