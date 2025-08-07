@@ -2,7 +2,7 @@
 import { getDatabase } from './src/db/connection.js';
 import { users } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 async function testPasswordVerification() {
   try {

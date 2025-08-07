@@ -36,3 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # TODO
 *.todo
 todo.md
+
+# node_modules (npm install)
+node_modules
+package-lock.json

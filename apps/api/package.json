@@ -4,7 +4,6 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node-cron": "^3.0.11",
@@ -12,10 +11,10 @@
   },
   "scripts": {
     "## Development ##": "",
-    "start": "bun run src/index",
+    "start:dev": "node --loader ts-node/esm src/index.ts",
+    "start:bun": "bun run src/index",
     "dev": "bun --watch src/",
-    "build": "echo 'API is a TypeScript runtime - no build step required'",
-    
+    "start": "bun run src/",
     "## Testing ##": "",
     "test": "bun run tests/test-endpoints.js",
     "test:all": "bun run tests/test-endpoints.js && bun run tests/test-appointments.js",
@@ -26,20 +25,17 @@
     "test:coverage": "bun test --coverage tests/",
     "test:full": "bun run tests/run-production-tests.js",
     "test:date-formatting": "bun run src/scripts/test-date-formatting.ts",
-    
     "## Database ##": "",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:generate:watch": "drizzle-kit generate --watch",
-    
     "## Seeding ##": "",
     "seed:users": "bun run src/db/seed-users.ts",
     "seed:services": "bun run src/db/seed-services.ts",
     "seed:schedules": "bun run src/db/seed-schedules.ts",
     "seed:all": "bun run src/db/seed-users.ts && bun run src/db/seed-services.ts && bun run src/scripts/setup-stripe-products.ts && bun run src/db/seed-schedules.ts",
-    
     "## Utilities ##": "",
     "cron:reminders": "bun run src/scripts/reminder-cron.ts"
   },
@@ -49,7 +45,7 @@
   "dependencies": {
     "@hono/node-server": "^1.14.4",
     "@hono/zod-validator": "^0.7.1",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.6.0",
@@ -60,6 +56,7 @@
     "nodemon": "^3.1.10",
     "postgres": "^3.4.7",
     "stripe": "^18.2.1",
+    "ts-node": "^10.9.2",
     "twilio": "^5.7.3",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",

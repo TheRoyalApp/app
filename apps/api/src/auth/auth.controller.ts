@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { getValidatedBody } from '../middleware/validation.middleware.js';

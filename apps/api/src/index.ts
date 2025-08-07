@@ -28,6 +28,7 @@ app.use('*', logger((str) => winstonLogger.http(str))); // HTTP request logging
 // CORS configuration for mobile app
 app.use('*', cors({
   origin: [
+    // Development URLs
     'exp://localhost:8081',
     'exp://localhost:19000',
     'exp://192.168.1.*:8081',
@@ -36,7 +37,13 @@ app.use('*', cors({
     'exp://192.168.1.198:19000',
     'http://localhost:3000',
     'http://localhost:8081',
-    'http://192.168.1.198:8081'
+    'http://192.168.1.198:8081',
+    // Production URLs - Add your Expo app's production URL
+    'https://theroyalbarber.com',
+    'https://*.theroyalbarber.com',
+    'exp://*',
+    'https://*.expo.dev',
+    'https://*.exp.direct'
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Refresh-Token', 'X-Requested-With'],

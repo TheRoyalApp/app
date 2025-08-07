@@ -1,11 +1,15 @@
+[variables]
+NODE_ENV = "production"
+NIXPACKS_METADATA = "website"
+
 [phases.setup]
-nixPkgs = ["nodejs", "npm"]
+nixPkgs = ["bun"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["bun install"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = []  # No build step needed - Bun runs TypeScript directly
 
 [start]
-cmd = "npm start" 
+cmd = "bun run server.ts"

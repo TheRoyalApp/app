@@ -1,42 +1,20 @@
 {
-  "name": "the-royal-barber-website",
-  "version": "1.0.0",
-  "description": "Official website for The Royal Barber app",
-  "main": "index.html",
-  "scripts": {
-    "## Development ##": "",
-    "start": "node server.js",
-    "dev": "node server.js",
-    
-    "## Build ##": "",
-    "build": "echo 'Static site - no build required'",
-    
-    "## Testing ##": "",
-    "test": "echo 'No tests specified for static website'",
-    "test:lint": "echo 'No linting configured for static website'",
-    "test:validate": "echo 'HTML validation not configured'"
-  },
-  "keywords": [
-    "barber",
-    "barbershop",
-    "the-royal-barber",
-    "website"
-  ],
-  "author": "The Royal Barber",
-  "license": "MIT",
-  "dependencies": {
-    "serve": "^14.2.1",
-    "hono": "^4.7.9",
-    "@hono/node-server": "^1.14.4"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "name": "website",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run server.ts",
+    "start": "bun run server.ts",
+    "type-check": "bun tsc --noEmit"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.8.9",
+    "@hono/node-server": "^1.12.0"
   }
 }
