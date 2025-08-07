@@ -1,102 +1,27 @@
 {
-  "name": "the_royal_barber",
+  "name": "the-royal-barber-monorepo",
   "version": "1.0.0",
-  "description": "The Royal Barber - Full-stack barbershop management system",
-  "main": "index.js",
-  "scripts": {
-    "## Development Commands ##": "",
-    "dev": "concurrently \"pnpm dev:api\" \"pnpm dev:mobile\" \"pnpm dev:website\"",
-    "dev:clear": "concurrently \"pnpm dev:api\" \"pnpm dev:mobile:clear\" \"pnpm dev:website\"",
-    "dev:api": "pnpm --filter api dev",
-    "dev:mobile": "pnpm --filter app ios",
-    "dev:mobile:clear": "pnpm --filter app ios:clear",
-    "dev:website": "pnpm --filter the-royal-barber-website dev",
-    "dev:android": "pnpm --filter app android",
-    "dev:android:clear": "pnpm --filter app android:clear",
-    "dev:web": "pnpm --filter app web",
-    "dev:web:clear": "pnpm --filter app web:clear",
-    
-    "## Start Commands ##": "",
-    "start": "pnpm start:api",
-    "start:api": "pnpm --filter api start",
-    "start:mobile": "pnpm --filter app start",
-    "start:website": "pnpm --filter the-royal-barber-website start",
-    "start:all": "concurrently \"pnpm start:api\" \"pnpm start:website\"",
-    
-    "## Build Commands ##": "",
-    "build": "pnpm build:api && pnpm build:website",
-    "build:api": "pnpm --filter api build",
-    "build:mobile": "pnpm --filter app build",
-    "build:website": "pnpm --filter the-royal-barber-website build",
-    
-    "## Test Commands ##": "",
-    "test": "pnpm test:api && pnpm test:mobile && pnpm test:website",
-    "test:api": "pnpm --filter api test",
-    "test:mobile": "pnpm --filter app test",
-    "test:website": "pnpm --filter the-royal-barber-website test",
-    "test:api:all": "pnpm --filter api test:all",
-    "test:api:appointments": "pnpm --filter api test:appointments",
-    "test:api:production": "pnpm --filter api test:production",
-    "test:api:coverage": "pnpm --filter api test:coverage",
-    "test:api:comprehensive": "pnpm --filter api test:comprehensive",
-    "test:api:full": "pnpm --filter api test:full",
-    
-    "## Database Commands ##": "",
-    "db:generate": "pnpm --filter api db:generate",
-    "db:generate:watch": "pnpm --filter api db:generate:watch",
-    "db:migrate": "pnpm --filter api db:migrate",
-    "db:studio": "pnpm --filter api db:studio",
-    "db:push": "pnpm --filter api db:push",
-    "db:setup": "node scripts/generate-db.js",
-    "db:setup:bash": "./scripts/generate-db.sh",
-    "db:setup:create": "./scripts/generate-db.sh --create-db",
-    "db:setup:force": "./scripts/generate-db.sh --force",
-    
-    "## Seeding Commands ##": "",
-    "seed": "pnpm seed:all",
-    "seed:users": "pnpm --filter api seed:users",
-    "seed:services": "pnpm --filter api seed:services",
-    "seed:schedules": "pnpm --filter api seed:schedules",
-    "seed:all": "pnpm --filter api seed:all",
-    
-    "## Deployment Commands ##": "",
-    "deploy": "pnpm deploy:all",
-    "deploy:api": "cd apps/api && railway up",
-    "deploy:website": "cd apps/website && railway up",
-    "deploy:all": "pnpm deploy:api && pnpm deploy:website",
-    
-    "## Utility Commands ##": "",
-    "install:all": "pnpm install && pnpm --filter api install && pnpm --filter app install && pnpm --filter website install",
-    "clean": "rm -rf node_modules && rm -rf apps/*/node_modules && rm -rf apps/*/dist && rm -rf apps/*/build",
-    "clean:install": "pnpm clean && pnpm install:all",
-    "cron:reminders": "pnpm --filter api cron:reminders",
-    "lint": "echo 'Linting not configured yet'",
-    "lint:fix": "echo 'Lint fix not configured yet'",
-    "format": "echo 'Formatting not configured yet'",
-    "format:check": "echo 'Format check not configured yet'",
-    
-    "## Development Workflow ##": "",
-    "setup": "pnpm install:all && pnpm db:setup && pnpm seed:all",
-    "reset": "pnpm clean:install && pnpm db:setup:force && pnpm seed:all",
-    "fresh": "pnpm clean && pnpm install:all && pnpm db:setup:force && pnpm seed:all"
-  },
-  "keywords": ["barbershop", "appointment", "management", "react-native", "api"],
-  "author": "The Royal Barber",
-  "license": "ISC",
-  "packageManager": "pnpm@10.8.1",
-  "devDependencies": {
-    "concurrently": "^9.2.0"
-  },
   "private": true,
-  "workspaces": [
-    "apps/*"
-  ],
-  "dependencies": {
-    "@react-native-picker/picker": "^2.11.1",
-    "pg": "^8.11.3",
-    "dotenv": "^16.3.1"
+  "scripts": {
+    "start": "pnpm --filter api start",
+    "start:api": "pnpm --filter api start",
+    "start:website": "pnpm --filter the-royal-barber-website start",
+    "build": "pnpm run build:api && pnpm run build:website",
+    "build:api": "pnpm --filter api build",
+    "build:website": "pnpm --filter the-royal-barber-website build",
+    "install:all": "pnpm install",
+    "install:api": "pnpm --filter api install",
+    "install:website": "pnpm --filter the-royal-barber-website install",
+    "dev": "pnpm run dev:api",
+    "dev:api": "pnpm --filter api dev",
+    "dev:website": "pnpm --filter the-royal-barber-website dev",
+    "test": "pnpm --filter api test && pnpm --filter the-royal-barber-website test",
+    "railway:api": "railway up --service api",
+    "railway:website": "railway up --service website"
   },
+  "packageManager": "pnpm@8.15.6",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
   }
 }

@@ -93,7 +93,7 @@ app.notFound((c: Context) => {
 const port = Number(process.env.PORT) || 3000;
 
 // Start server
-console.log(`🚀 Server running on http://localhost:${port}`);
+console.log(`🚀 Server running on port: ${port}`);
 console.log(`📍 Routes: / /health /privacy /terms`);
 
 serve({

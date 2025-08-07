@@ -7,7 +7,8 @@
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node-cron": "^3.0.11",
-    "drizzle-kit": "^0.31.4"
+    "drizzle-kit": "^0.31.4",
+    "esbuild": "^0.25.8"
   },
   "scripts": {
     "## Development ##": "",

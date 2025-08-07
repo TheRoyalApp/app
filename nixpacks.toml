@@ -1,14 +1,15 @@
 [variables]
-NODE_ENV = "production"
+NODE_ENV = "DEVELOPMENT"
+NIXPACKS_METADATA = "monorepo-api"
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "bun"]
+nixPkgs = ["nodejs", "pnpm"]
 
 [phases.install]
-cmds = ["cd apps/api && bun install"]
+cmds = ["pnpm install"]
 
 [phases.build]
-cmds = ["echo 'No build step needed for Bun TypeScript runtime'"]
+cmds = ["pnpm run build:api"]
 
 [start]
-cmd = "cd apps/api && bun run src/index.ts" 
+cmd = "pnpm start:api" 
