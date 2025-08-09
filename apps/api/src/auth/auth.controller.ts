@@ -45,7 +45,27 @@ export function generateRefreshToken(user: any): string {
 
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET!);
+    const decoded = jwt.verify(token, JWT_SECRET!);
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function verifyTokenWithUser(token: string): Promise<any> {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET!) as any;
+    
+    // Get current user from database to ensure admin status is up-to-date
+    const db = await getDatabase();
+    const user = await db.select().from(users).where(eq(users.id, decoded.id)).limit(1);
+    
+    if (user.length === 0) {
+      return null;
+    }
+
+    // Return user with current admin status
+    return user[0];
   } catch (error) {
     return null;
   }

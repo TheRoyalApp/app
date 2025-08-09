@@ -62,13 +62,11 @@ function RootLayoutNav() {
 		return () => clearTimeout(timer);
 	}, [isLoading]);
 
-	// Global deep link handling for payment callbacks
+    // Global deep link handling for payment callbacks
 	React.useEffect(() => {
-		// Track if we're expecting a payment callback
-		let paymentCallbackExpected = false;
-		let paymentCallbackTimeout: ReturnType<typeof setTimeout> | null = null;
-		let alertShown = false; // Flag to prevent duplicate alerts
-		let paymentCancelled = false; // Global flag to track if payment was cancelled
+        // Track alert state and cancellation state (used for non-timeout fallbacks)
+        let alertShown = false;
+        let paymentCancelled = false;
 
 		const handleUrl = (url: string) => {
 			console.log('🔗 Global URL handler received:', url);
@@ -76,133 +74,76 @@ function RootLayoutNav() {
 			// Normalize URL to handle both schemes
 			const normalizedUrl = url.replace('theroyalbarber://', 'app://');
 			
-			// Only clear payment callback timeout if this is a payment-related deep link
-			if (normalizedUrl.includes('app://payment/') || normalizedUrl.includes('app://payment-callback')) {
-				// Clear any pending payment callback timeout
-				if (paymentCallbackTimeout) {
-					clearTimeout(paymentCallbackTimeout);
-					paymentCallbackTimeout = null;
-				}
-				// Clear local timeout if it exists
-				if ((global as any).clearLocalPaymentTimeout) {
-					(global as any).clearLocalPaymentTimeout();
-				}
-				paymentCallbackExpected = false;
-				alertShown = false; // Reset alert flag when payment deep link is received
-				paymentCancelled = false; // Reset payment cancelled flag when payment deep link is received
-			}
+            // Reset flags when a payment-related deep link is received
+            if (normalizedUrl.includes('app://payment/') || normalizedUrl.includes('app://payment-callback')) {
+                alertShown = false;
+                paymentCancelled = false;
+            }
 			
-			// Handle payment success URLs (both schemes)
-			if (normalizedUrl.includes('app://payment/success')) {
-				// Close any open WebBrowser session
-				WebBrowser.dismissBrowser();
+            // Handle payment success URLs (custom schemes and HTTPS bounce page)
+            if (
+                normalizedUrl.includes('app://payment/success') ||
+                normalizedUrl.includes('theroyalbarber://payment/success') ||
+                normalizedUrl.includes('https://theroyalbarber.com/payment/success')
+            ) {
+                // Close any open WebBrowser session
+                try { WebBrowser.dismissBrowser(); } catch {}
+				
+				// Clear payment evidence since payment was successful
+				(global as any).paymentAttempted = false;
+				console.log('💰 Payment evidence cleared - payment successful');
 				
 				// Parse URL parameters with better error handling
 				let urlObj;
 				try {
 					urlObj = new URL(url);
 				} catch (urlError) {
-					// Show success message even if URL parsing fails
-					if (!alertShown) {
-						alertShown = true;
-						WebBrowser.dismissBrowser();
-						Alert.alert(
-							'¡Pago Exitoso!',
-							'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-							[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-						);
-					}
-					return;
+                    // If URL parsing fails, still navigate to success screen without delays
+                    router.replace({ pathname: '/payment/success' });
+                    return;
 				}
 				
-				const status = urlObj.searchParams.get('status');
+                const status = urlObj.searchParams.get('status');
 				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				// Handle success even if some parameters are missing (embedded browser limitation)
-				if (status === 'success') {
-					// Navigate to success screen with appointment details
-					const appointmentDate = urlObj.searchParams.get('appointmentDate');
-					const serviceName = urlObj.searchParams.get('serviceName');
-					const barberName = urlObj.searchParams.get('barberName');
-					const amount = urlObj.searchParams.get('amount');
-					
-					// Decode URL parameters
-					const decodedParams = {
-						timeSlot: timeSlot ? decodeURIComponent(timeSlot) : 'TBD',
-						appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : 'TBD',
-						serviceName: serviceName ? decodeURIComponent(serviceName) : 'Servicio',
-						barberName: barberName ? decodeURIComponent(barberName) : 'Barbero',
-						amount: amount ? decodeURIComponent(amount) : '0',
-					};
-					
-					// Wait for navigation to be ready and user to be authenticated
-					const attemptNavigation = () => {
-						try {
-							// Check if user is authenticated and navigation is ready
-							if (user && !isLoading) {
-								router.replace({
-									pathname: '/payment/success',
-									params: decodedParams
-								});
-								return true; // Navigation successful
-							} else {
-								return false; // Navigation failed, will retry
-							}
-						} catch (navError) {
-							// Fallback to alert if navigation fails
-							if (!alertShown) {
-								alertShown = true;
-								WebBrowser.dismissBrowser();
-								Alert.alert(
-									'¡Pago Exitoso!',
-									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-								);
-							}
-							return true; // Don't retry after fallback
-						}
-					};
-					
-					// Try navigation immediately
-					if (!attemptNavigation()) {
-						// If failed, retry with increasing delays
-						const retryDelays = [500, 1000, 2000];
-						retryDelays.forEach((delay, index) => {
-							setTimeout(() => {
-								attemptNavigation();
-							}, delay);
-						});
-						
-						// Final fallback after 5 seconds
-						setTimeout(() => {
-							if (!alertShown) {
-								alertShown = true;
-								WebBrowser.dismissBrowser();
-								Alert.alert(
-									'¡Pago Exitoso!',
-									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-								);
-							}
-						}, 5000);
-					}
-				} else {
-					// Show success message even if parameters are invalid
-					if (!alertShown) {
-						alertShown = true;
-						WebBrowser.dismissBrowser();
-						Alert.alert(
-							'¡Pago Exitoso!',
-							'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-							[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-						);
-					}
-				}
+                // Always navigate to success screen immediately (no timeouts or alerts)
+                const appointmentDate = urlObj.searchParams.get('appointmentDate');
+                const serviceName = urlObj.searchParams.get('serviceName');
+                const barberName = urlObj.searchParams.get('barberName');
+                const amount = urlObj.searchParams.get('amount');
+
+                const decodedParams = {
+                    timeSlot: timeSlot ? decodeURIComponent(timeSlot) : undefined,
+                    appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : undefined,
+                    serviceName: serviceName ? decodeURIComponent(serviceName) : undefined,
+                    barberName: barberName ? decodeURIComponent(barberName) : undefined,
+                    amount: amount ? decodeURIComponent(amount) : undefined,
+                } as Record<string, string | undefined>;
+
+                try {
+                    if (user && !isLoading) {
+                        router.replace({ pathname: '/payment/success', params: decodedParams });
+                    } else {
+                        // Navigate without waiting; router will handle stack readiness
+                        router.replace({ pathname: '/payment/success', params: decodedParams });
+                    }
+                } catch (navError) {
+                    // As a last resort, navigate to success without params
+                    router.replace({ pathname: '/payment/success' });
+                }
 			}
-			// Handle payment failure URLs (both schemes)
-			else if (normalizedUrl.includes('app://payment/failed')) {
-				// Close any open WebBrowser session
-				WebBrowser.dismissBrowser();
+            // Handle payment failure URLs (custom schemes and HTTPS bounce page)
+            else if (
+                normalizedUrl.includes('app://payment/failed') ||
+                normalizedUrl.includes('theroyalbarber://payment/failed') ||
+                normalizedUrl.includes('https://theroyalbarber.com/payment/failed')
+            ) {
+                // Close any open WebBrowser session
+                try { WebBrowser.dismissBrowser(); } catch {}
+				
+				// Clear payment evidence since payment failed
+				(global as any).paymentAttempted = false;
+				console.log('💰 Payment evidence cleared - payment failed');
 				
 				// Parse URL parameters with better error handling
 				let urlObj;
@@ -299,10 +240,10 @@ function RootLayoutNav() {
 					);
 				}
 			}
-			// Handle legacy payment-callback URLs for backward compatibility (both schemes)
+            // Handle legacy payment-callback URLs for backward compatibility (both schemes)
 			else if (normalizedUrl.includes('app://payment-callback')) {
-				// Close any open WebBrowser session
-				WebBrowser.dismissBrowser();
+                // Close any open WebBrowser session
+                try { WebBrowser.dismissBrowser(); } catch {}
 				
 				// Parse URL parameters with better error handling
 				let urlObj;
@@ -316,140 +257,34 @@ function RootLayoutNav() {
 				const status = urlObj.searchParams.get('status');
 				const timeSlot = urlObj.searchParams.get('timeSlot');
 				
-				// Handle legacy success even if some parameters are missing (embedded browser limitation)
-				if (status === 'success') {
-					// Navigate to success screen with appointment details
-					const appointmentDate = urlObj.searchParams.get('appointmentDate');
-					const serviceName = urlObj.searchParams.get('serviceName');
-					const barberName = urlObj.searchParams.get('barberName');
-					const amount = urlObj.searchParams.get('amount');
-					
-					// Decode URL parameters
-					const decodedParams = {
-						timeSlot: timeSlot ? decodeURIComponent(timeSlot) : 'TBD',
-						appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : 'TBD',
-						serviceName: serviceName ? decodeURIComponent(serviceName) : 'Servicio',
-						barberName: barberName ? decodeURIComponent(barberName) : 'Barbero',
-						amount: amount ? decodeURIComponent(amount) : '0',
-					};
-					
-					console.log('Attempting to navigate to success screen with legacy params:', decodedParams);
-					
-					// Wait for navigation to be ready and user to be authenticated
-					const attemptNavigation = () => {
-						try {
-							// Check if user is authenticated and navigation is ready
-							if (user && !isLoading) {
-								router.replace({
-									pathname: '/payment/success',
-									params: decodedParams
-								});
-								console.log('✅ Successfully navigated to payment success screen (legacy)');
-								return true; // Navigation successful
-							} else {
-								console.log('Navigation not ready yet, retrying...');
-								return false; // Navigation failed, will retry
-							}
-						} catch (navError) {
-							console.error('Global navigation error in legacy success handler:', navError);
-							// Fallback to alert if navigation fails
-							WebBrowser.dismissBrowser();
-							Alert.alert(
-								'¡Pago Exitoso!',
-								'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-								[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-							);
-							return true; // Don't retry after fallback
-						}
-					};
-					
-					// Try navigation immediately
-					if (!attemptNavigation()) {
-						// If failed, retry with increasing delays
-						const retryDelays = [500, 1000, 2000];
-						retryDelays.forEach((delay, index) => {
-							setTimeout(() => {
-								if (!attemptNavigation()) {
-									console.log(`Navigation attempt ${index + 1} failed, will retry in ${retryDelays[index + 1] || 3000}ms`);
-								}
-							}, delay);
-						});
-						
-						// Final fallback after 5 seconds
-						setTimeout(() => {
-							console.log('🔄 Final fallback: Showing success alert (legacy)');
-							if (!alertShown) {
-								alertShown = true;
-								WebBrowser.dismissBrowser();
-								Alert.alert(
-									'¡Pago Exitoso!',
-									'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-									[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-								);
-							}
-						}, 5000);
-					}
-				} else {
-					console.warn('Invalid legacy URL parameters:', { status, timeSlot });
-					// Show success message even if parameters are invalid
-					WebBrowser.dismissBrowser();
-					Alert.alert(
-						'¡Pago Exitoso!',
-						'Tu cita ha sido confirmada. Te esperamos en la fecha y hora seleccionada.',
-						[{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-					);
-				}
+                // Handle legacy success immediately without timeouts
+                if (status === 'success') {
+                    const appointmentDate = urlObj.searchParams.get('appointmentDate');
+                    const serviceName = urlObj.searchParams.get('serviceName');
+                    const barberName = urlObj.searchParams.get('barberName');
+                    const amount = urlObj.searchParams.get('amount');
+
+                    const decodedParams = {
+                        timeSlot: timeSlot ? decodeURIComponent(timeSlot) : undefined,
+                        appointmentDate: appointmentDate ? decodeURIComponent(appointmentDate) : undefined,
+                        serviceName: serviceName ? decodeURIComponent(serviceName) : undefined,
+                        barberName: barberName ? decodeURIComponent(barberName) : undefined,
+                        amount: amount ? decodeURIComponent(amount) : undefined,
+                    } as Record<string, string | undefined>;
+
+                    try {
+                        router.replace({ pathname: '/payment/success', params: decodedParams });
+                    } catch (navError) {
+                        router.replace({ pathname: '/payment/success' });
+                    }
+                } else {
+                    console.warn('Invalid legacy URL parameters:', { status, timeSlot });
+                    router.replace({ pathname: '/payment/success' });
+                }
 			}
 		};
 
-		// Function to set up payment callback expectation
-		const expectPaymentCallback = () => {
-			paymentCallbackExpected = true;
-			console.log('💰 Payment callback expected - setting up timeout');
-			
-			// Set up timeout for payment callback
-			paymentCallbackTimeout = setTimeout(() => {
-				if (paymentCallbackExpected && !alertShown && !paymentCancelled) {
-					console.log('⏰ Payment callback timeout - showing success message');
-					paymentCallbackExpected = false;
-					alertShown = true;
-					
-					// Show success message as fallback
-					WebBrowser.dismissBrowser();
-					Alert.alert(
-						'¡Pago Procesado!',
-						'Tu pago ha sido procesado. Si el pago fue exitoso, tu cita ha sido confirmada. Revisa tu historial para confirmar.',
-						[
-							{ 
-								text: 'Ver Historial', 
-								onPress: () => router.replace('/(tabs)/history') 
-							},
-							{ 
-								text: 'OK', 
-								onPress: () => router.replace('/(tabs)') 
-							}
-						]
-					);
-				}
-			}, 8000); // Reduced to 8 seconds for faster fallback
-		};
-
-		// Expose the function globally for the appointment screen to use
-		(global as any).expectPaymentCallback = expectPaymentCallback;
-
-		// Function to clear payment callback expectation
-		const clearPaymentCallback = () => {
-			paymentCallbackExpected = false;
-			paymentCancelled = true; // Mark payment as cancelled
-			if (paymentCallbackTimeout) {
-				clearTimeout(paymentCallbackTimeout);
-				paymentCallbackTimeout = null;
-			}
-			console.log('💰 Payment callback cleared - user cancelled payment');
-		};
-
-		// Expose the clear function globally
-		(global as any).clearPaymentCallback = clearPaymentCallback;
+        // Remove timeout-based fallback flow; no global expectation or clear functions
 
 		const subscription = Linking.addEventListener('url', ({ url }) => {
 			console.log('🔗 Expo Linking URL event received:', url);

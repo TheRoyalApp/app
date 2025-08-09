@@ -76,6 +76,19 @@ paymentsRoute.put('/:id', async (c) => {
     }
 });
 
+/**
+ * GET /payments/webhook-status
+ * Simple endpoint to check if webhooks are being received
+ */
+paymentsRoute.get('/webhook-status', async (c) => {
+  return c.json(successResponse(200, {
+    message: 'Webhook endpoint is accessible',
+    endpoint: '/payments/webhook',
+    timestamp: new Date().toISOString(),
+    note: 'Check server logs for actual webhook receipts'
+  }), 200);
+});
+
 paymentsRoute.get('/:id', async (c) => {
     try {
         const { id } = c.req.param();
@@ -240,7 +253,7 @@ paymentsRoute.post('/checkout', async (c) => {
       metadata,
     });
 
-    return c.json(successResponse(200, { url: session.url }), 200);
+    return c.json(successResponse(200, { url: session.url, sessionId: session.id }), 200);
   } catch (error) {
     console.error('Error creating Stripe Checkout session:', error);
     return c.json(errorResponse(500, 'Failed to create Stripe Checkout session'), 500);
@@ -252,10 +265,23 @@ paymentsRoute.post('/checkout', async (c) => {
  * Handles Stripe webhook events for payment confirmation
  */
 paymentsRoute.post('/webhook', async (c) => {
-  console.log('🔔 Webhook received');
+  const timestamp = new Date().toISOString();
+  console.log(`🔔 [${timestamp}] Webhook received`);
   
   const signature = c.req.header('stripe-signature');
   const body = await c.req.text();
+  
+  // Log webhook receipt for debugging
+  console.log(`📋 [${timestamp}] Webhook details:`, {
+    hasSignature: !!signature,
+    bodyLength: body.length,
+    bodyPreview: body.substring(0, 100) + '...',
+    headers: {
+      'content-type': c.req.header('content-type'),
+      'user-agent': c.req.header('user-agent'),
+      'stripe-signature': signature ? 'present' : 'missing'
+    }
+  });
 
   console.log('Webhook headers:', {
     signature: signature ? 'present' : 'missing',
@@ -314,6 +340,9 @@ paymentsRoute.post('/webhook', async (c) => {
           paymentStatus: session.payment_status,
           status: session.status
         });
+        
+        // Log success for webhook monitoring
+        console.log(`✅ [${timestamp}] PAYMENT COMPLETED: Session ${session.id} for $${(session.amount_total || 0) / 100}`);
         
         // Extract metadata
         const serviceId = session.metadata?.serviceId;

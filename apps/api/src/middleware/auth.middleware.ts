@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import type { User } from '../users/users.d.js';
-import { generateToken, verifyRefreshToken, verifyToken } from '../auth/auth.controller.js';
+import { generateToken, verifyRefreshToken, verifyToken, verifyTokenWithUser } from '../auth/auth.controller.js';
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -11,6 +11,16 @@ declare module 'hono' {
 
 function validateJWTToken(token: string): User | null {
   const user = verifyToken(token);
+
+  if (!user) {
+    return null;
+  }
+
+  return user;
+}
+
+async function validateJWTTokenWithUser(token: string): Promise<User | null> {
+  const user = await verifyTokenWithUser(token);
 
   if (!user) {
     return null;
@@ -44,7 +54,7 @@ export async function authMiddleware(c: Context, next: Next) {
 
   const token = authHeader.substring(7);
 
-  let user = validateJWTToken(token);
+  let user = await validateJWTTokenWithUser(token);
 
   if (!user) {
     if (!refreshToken) {

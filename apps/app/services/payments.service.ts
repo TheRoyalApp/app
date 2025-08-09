@@ -61,6 +61,16 @@ export interface CheckoutSessionData {
 
 export interface CheckoutResponse {
   url: string;
+  sessionId?: string;
+}
+
+export interface StripeSessionStatusResponse {
+  sessionId: string;
+  status: string; // 'open' | 'complete' | 'expired'
+  paymentStatus: string; // 'unpaid' | 'paid' | 'no_payment_required'
+  metadata?: Record<string, string>;
+  amountTotal?: number | null;
+  currency?: string | null;
 }
 
 // Payments Service
@@ -255,6 +265,18 @@ export class PaymentsService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create checkout session',
+      };
+    }
+  }
+
+  // Verify Stripe Checkout session status by ID
+  static async getCheckoutSessionStatus(sessionId: string): Promise<ApiResponse<StripeSessionStatusResponse>> {
+    try {
+      return await apiClient.get<StripeSessionStatusResponse>(`/payments/session/${sessionId}`);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to retrieve session status',
       };
     }
   }

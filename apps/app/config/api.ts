@@ -17,7 +17,7 @@ const getDevBaseURL = () => {
 export const API_CONFIG = {
   // Development
   development: {
-    baseURL: getDevBaseURL(),
+    baseURL: 'https://api-staging-d8aa.up.railway.app',
   },
   
   // Production - UPDATE THIS WITH YOUR ACTUAL PRODUCTION URL
