@@ -415,8 +415,23 @@ paymentsRoute.post('/webhook', async (c) => {
 
             // Check if the time slot is available before creating appointment
             if (barberId && appointmentDate && timeSlot) {
+              console.log('🔍 Checking availability for:', {
+                barberId,
+                appointmentDate,
+                timeSlot,
+                dateFormat: 'dd/mm/yyyy'
+              });
+              
               const { isTimeSlotAvailable } = await import('../schedules/schedules.controller.js');
               const isAvailable = await isTimeSlotAvailable(barberId, appointmentDate, timeSlot as TimeSlot);
+              
+              console.log('📊 Availability check result:', {
+                isAvailable,
+                barberId,
+                appointmentDate,
+                timeSlot
+              });
+              
               if (!isAvailable) {
                 console.error(`❌ Time slot not available: ${timeSlot} on ${appointmentDate} for barber ${barberId}`);
                 throw new Error(`El horario seleccionado (${timeSlot}) no está disponible para la fecha ${appointmentDate}. Por favor, selecciona otro horario.`);
@@ -581,7 +596,13 @@ paymentsRoute.post('/webhook', async (c) => {
           console.log(`🎉 Payment completed successfully for service ${serviceId} with ${paymentType} payment`);
         } catch (err) {
           console.error('❌ Error in webhook transaction:', err);
-          return c.json(errorResponse(500, 'Webhook processing failed: ' + (err instanceof Error ? err.message : String(err))), 500);
+          // Still return 200 to Stripe to prevent retries, but log the error
+          console.error('🔄 Returning 200 to Stripe to prevent retries, but appointment creation failed');
+          return c.json(successResponse(200, { 
+            received: true, 
+            error: 'Appointment creation failed but payment was processed',
+            details: err instanceof Error ? err.message : String(err)
+          }), 200);
         }
         break;
 

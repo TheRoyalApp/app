@@ -368,9 +368,12 @@ export default function AppointmentScreen() {
 			setAlertShown(false); // Reset alert flag for new payment
 			setPaymentCancelled(false); // Reset payment cancelled flag
 
-			// Format date for API (expects dd/mm/yyyy format)
-			const dateObj = new Date(selectedDate);
-			const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+					// Format date for API (expects dd/mm/yyyy format) - use timezone-safe parsing
+		const formattedDate = (() => {
+			// selectedDate is in ISO format (YYYY-MM-DD), parse it directly
+			const [year, month, day] = selectedDate.split('-');
+			return `${day}/${month}/${year}`;
+		})();
 
             // Use HTTPS bounce pages (Safari-friendly) that immediately redirect to our app scheme; auth session will close automatically
             const successUrl = `https://theroyalbarber.com/payment/success?status=success&timeSlot=${encodeURIComponent(selectedTime)}&appointmentDate=${encodeURIComponent(formattedDate)}&serviceName=${encodeURIComponent(selectedService.name)}&barberName=${encodeURIComponent(selectedBarber.name)}&amount=${encodeURIComponent(selectedService.price.toString())}`;

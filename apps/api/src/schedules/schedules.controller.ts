@@ -327,6 +327,15 @@ export async function isTimeSlotAvailable(barberId: string, date: string, timeSl
     
     const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     const dayOfWeek = getDayOfWeek(targetDate);
+    
+    console.log(`[isTimeSlotAvailable] Date parsing:`, {
+      inputDate: date,
+      parsedParts: { day, month, year },
+      targetDate: targetDate.toISOString(),
+      dayOfWeek,
+      barberId,
+      timeSlot
+    });
 
     // Normalize timeSlot to 'HH:00' format
     let normalizedTimeSlot = timeSlot;
