@@ -98,24 +98,24 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
     appointments: (c: any, next: any) => next(),
   };
 } else {
-  // Predefined rate limit configurations
+  // Predefined rate limit configurations - Very flexible for high user interaction
   rateLimits = {
-    // Strict limits for authentication endpoints
+    // Generous limits for authentication endpoints - allow multiple login attempts
     auth: createRateLimit({
-      windowMs: 60 * 1000, // 1 minute (changed from 15 minutes)
-      max: 500, // 500 requests per minute (changed from 15 per 15 minutes)
+      windowMs: 60 * 1000, // 1 minute
+      max: 300, // 300 requests per minute - permitir múltiples intentos de auth
       message: 'Too many authentication attempts, please try again later'
     }),
-    // Moderate limits for general API endpoints
+    // Very high limits for general API endpoints - app requires lots of interaction
     api: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 200, // 200 requests per minute (increased from 100)
+      max: 5000, // 5000 requests per minute - extremely generous for user interactions
       message: 'Too many requests, please slow down'
     }),
-    // Higher limits for authenticated users
+    // Extremely high limits for authenticated users - they need maximum flexibility
     authenticated: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 500, // 500 requests per minute (increased from 200)
+      max: 10000, // 10000 requests per minute para usuarios autenticados
       message: 'Too many requests, please slow down',
       keyGenerator: (c: any) => {
         // Use user ID if authenticated, otherwise use IP
@@ -123,20 +123,20 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') {
         return user ? `user:${user.id}` : (c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown');
       }
     }),
-    // Specific limits for appointment booking
+    // Extremely flexible limits for appointment booking - critical user flow
     appointments: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 30, // 30 appointment requests per minute (increased from 10)
+      max: 2000, // 2000 appointment requests per minute - allows heavy exploration
       message: 'Too many appointment requests, please slow down',
       keyGenerator: (c: any) => {
         const user = c.get('user');
         return user ? `appointments:${user.id}` : (c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown');
       }
     }),
-    // Admin endpoints with higher limits
+    // High limits for admin endpoints
     admin: createRateLimit({
       windowMs: 60 * 1000, // 1 minute
-      max: 100, // 100 requests per minute (increased from 50)
+      max: 2000, // 2000 requests per minute para admin - very high
       message: 'Too many admin requests, please slow down',
       keyGenerator: (c: any) => {
         const user = c.get('user');
