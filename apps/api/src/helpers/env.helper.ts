@@ -1,0 +1,171 @@
+import logger from './logger.js';
+
+interface EnvironmentConfig {
+  // Database
+  DATABASE_URL: string;
+  
+  // JWT Configuration
+  JWT_SECRET: string;
+  REFRESH_SECRET: string;
+  INTERNAL_API_SECRET: string;
+  
+  // Stripe Configuration
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
+  
+  // Twilio Configuration
+  TWILIO_ACCOUNT_SID: string;
+  TWILIO_AUTH_TOKEN: string;
+  TWILIO_PHONE_NUMBER: string;
+  
+  // Server Configuration
+  NODE_ENV: string;
+  PORT: string;
+  API_BASE_URL?: string;
+  
+  // Feature Flags
+  DISABLE_SMS?: string;
+  DEBUG_MODE?: string;
+  LOG_SMS_CODES?: string;
+  ENABLE_NOTIFICATIONS?: string;
+}
+
+const requiredEnvVars: (keyof EnvironmentConfig)[] = [
+  'DATABASE_URL',
+  'JWT_SECRET',
+  'REFRESH_SECRET',
+  'INTERNAL_API_SECRET',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_PHONE_NUMBER',
+  'NODE_ENV',
+  'PORT'
+];
+
+const optionalEnvVars: (keyof EnvironmentConfig)[] = [
+  'API_BASE_URL',
+  'DISABLE_SMS',
+  'DEBUG_MODE',
+  'LOG_SMS_CODES',
+  'ENABLE_NOTIFICATIONS'
+];
+
+/**
+ * Validates that all required environment variables are present
+ * @returns Validated environment configuration
+ * @throws Error if required variables are missing
+ */
+export function validateEnvironment(): EnvironmentConfig {
+  const missing: string[] = [];
+  const config: Partial<EnvironmentConfig> = {};
+  
+  // Check required variables
+  for (const envVar of requiredEnvVars) {
+    const value = process.env[envVar];
+    if (!value || value.trim() === '') {
+      missing.push(envVar);
+    } else {
+      config[envVar] = value;
+    }
+  }
+  
+  // Add optional variables
+  for (const envVar of optionalEnvVars) {
+    const value = process.env[envVar];
+    if (value) {
+      config[envVar] = value;
+    }
+  }
+  
+  // Validate NODE_ENV [[memory:4052838]]
+  if (config.NODE_ENV && !['development', 'DEV', 'DEVELOPMENT', 'production'].includes(config.NODE_ENV)) {
+    logger.warn(`NODE_ENV is set to '${config.NODE_ENV}'. Expected: 'development', 'DEV', 'DEVELOPMENT', or 'production'`);
+  }
+  
+  // Set default values for optional variables
+  config.DISABLE_SMS = config.DISABLE_SMS || (config.NODE_ENV === 'development' || config.NODE_ENV === 'DEV' ? 'true' : 'false');
+  config.DEBUG_MODE = config.DEBUG_MODE || (config.NODE_ENV === 'development' || config.NODE_ENV === 'DEV' ? 'true' : 'false');
+  config.LOG_SMS_CODES = config.LOG_SMS_CODES || (config.NODE_ENV === 'development' || config.NODE_ENV === 'DEV' ? 'true' : 'false');
+  config.ENABLE_NOTIFICATIONS = config.ENABLE_NOTIFICATIONS || 'true';
+  config.API_BASE_URL = config.API_BASE_URL || `http://localhost:${config.PORT || '3001'}`;
+  
+  if (missing.length > 0) {
+    const errorMessage = `Missing required environment variables: ${missing.join(', ')}`;
+    logger.error('Environment validation failed', { missingVariables: missing });
+    
+    console.error('\n🚨 ENVIRONMENT CONFIGURATION ERROR 🚨');
+    console.error('═'.repeat(50));
+    console.error(`Missing required environment variables:`);
+    missing.forEach(variable => {
+      console.error(`  ❌ ${variable}`);
+    });
+    console.error('\n💡 To fix this:');
+    console.error('  1. Copy env.example to .env');
+    console.error('  2. Fill in all required values');
+    console.error('  3. Restart the server');
+    console.error('═'.repeat(50));
+    
+    throw new Error(errorMessage);
+  }
+  
+  // Validate JWT secrets length for security
+  if (config.JWT_SECRET && config.JWT_SECRET.length < 32) {
+    logger.warn('JWT_SECRET is shorter than 32 characters. Consider using a longer secret for better security.');
+  }
+  
+  if (config.REFRESH_SECRET && config.REFRESH_SECRET.length < 32) {
+    logger.warn('REFRESH_SECRET is shorter than 32 characters. Consider using a longer secret for better security.');
+  }
+  
+  // Log configuration status
+  logger.info('Environment validation successful', {
+    nodeEnv: config.NODE_ENV,
+    port: config.PORT,
+    disableSms: config.DISABLE_SMS,
+    debugMode: config.DEBUG_MODE,
+    enableNotifications: config.ENABLE_NOTIFICATIONS
+  });
+  
+  return config as EnvironmentConfig;
+}
+
+/**
+ * Gets the validated environment configuration
+ * Caches the result to avoid re-validation
+ */
+let cachedConfig: EnvironmentConfig | null = null;
+
+export function getEnvironmentConfig(): EnvironmentConfig {
+  if (!cachedConfig) {
+    cachedConfig = validateEnvironment();
+  }
+  return cachedConfig;
+}
+
+/**
+ * Type-safe access to environment variables
+ */
+export const env = {
+  get DATABASE_URL() { return getEnvironmentConfig().DATABASE_URL; },
+  get JWT_SECRET() { return getEnvironmentConfig().JWT_SECRET; },
+  get REFRESH_SECRET() { return getEnvironmentConfig().REFRESH_SECRET; },
+  get INTERNAL_API_SECRET() { return getEnvironmentConfig().INTERNAL_API_SECRET; },
+  get STRIPE_SECRET_KEY() { return getEnvironmentConfig().STRIPE_SECRET_KEY; },
+  get STRIPE_WEBHOOK_SECRET() { return getEnvironmentConfig().STRIPE_WEBHOOK_SECRET; },
+  get TWILIO_ACCOUNT_SID() { return getEnvironmentConfig().TWILIO_ACCOUNT_SID; },
+  get TWILIO_AUTH_TOKEN() { return getEnvironmentConfig().TWILIO_AUTH_TOKEN; },
+  get TWILIO_PHONE_NUMBER() { return getEnvironmentConfig().TWILIO_PHONE_NUMBER; },
+  get NODE_ENV() { return getEnvironmentConfig().NODE_ENV; },
+  get PORT() { return getEnvironmentConfig().PORT; },
+  get API_BASE_URL() { return getEnvironmentConfig().API_BASE_URL; },
+  get DISABLE_SMS() { return getEnvironmentConfig().DISABLE_SMS === 'true'; },
+  get DEBUG_MODE() { return getEnvironmentConfig().DEBUG_MODE === 'true'; },
+  get LOG_SMS_CODES() { return getEnvironmentConfig().LOG_SMS_CODES === 'true'; },
+  get ENABLE_NOTIFICATIONS() { return getEnvironmentConfig().ENABLE_NOTIFICATIONS === 'true'; },
+  
+  // Helper methods
+  isDevelopment() { return this.NODE_ENV === 'development' || this.NODE_ENV === 'DEV' || this.NODE_ENV === 'DEVELOPMENT'; },
+  isProduction() { return this.NODE_ENV === 'production'; }
+};

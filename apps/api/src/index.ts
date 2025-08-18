@@ -8,6 +8,10 @@ import winstonLogger from './helpers/logger.js';
 import { errorResponse } from './helpers/response.helper.js';
 import { getDatabase } from './db/connection.js';
 import cronService from './services/cron.service.js';
+import { validateEnvironment, env } from './helpers/env.helper.js';
+import { correlationMiddleware, requestLoggingMiddleware } from './middleware/logging.middleware.js';
+import { handleError, HTTP_STATUS } from './helpers/error.helper.js';
+import { ContextLogger } from './helpers/logger.js';
 
 // Import routes
 import authRoutes from './auth/auth.route.js';
@@ -23,28 +27,45 @@ const app = new Hono();
 // Production middleware stack
 app.use('*', timing()); // Request timing
 app.use('*', secureHeaders()); // Security headers
-app.use('*', logger((str) => winstonLogger.http(str))); // HTTP request logging
+app.use('*', correlationMiddleware); // Add correlation ID to requests
+app.use('*', requestLoggingMiddleware); // Enhanced request logging
 
 // CORS configuration for mobile app
 app.use('*', cors({
-  origin: [
-    // Development URLs
-    'exp://localhost:8081',
-    'exp://localhost:19000',
-    'exp://192.168.1.*:8081',
-    'exp://192.168.1.*:19000',
-    'exp://192.168.1.198:8081',
-    'exp://192.168.1.198:19000',
-    'http://localhost:3000',
-    'http://localhost:8081',
-    'http://192.168.1.198:8081',
-    // Production URLs - Add your Expo app's production URL
-    'https://theroyalbarber.com',
-    'https://*.theroyalbarber.com',
-    'exp://*',
-    'https://*.expo.dev',
-    'https://*.exp.direct'
-  ],
+  origin: (origin) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return true;
+    
+    const allowedOrigins = [
+      // Development URLs
+      'exp://localhost:8081',
+      'exp://localhost:19000',
+      'http://localhost:3000',
+      'http://localhost:8081',
+      // Production URLs
+      'https://theroyalbarber.com',
+      'https://api.theroyalbarber.com',
+      'https://app.theroyalbarber.com'
+    ];
+    
+    // Allow development patterns with specific IP ranges
+    const devPatterns = [
+      /^exp:\/\/192\.168\.\d+\.\d+:(?:8081|19000)$/,
+      /^http:\/\/192\.168\.\d+\.\d+:8081$/,
+      /^https:\/\/.*\.expo\.dev$/,
+      /^https:\/\/.*\.exp\.direct$/
+    ];
+    
+    // Check exact matches first
+    if (allowedOrigins.includes(origin)) return true;
+    
+    // Check development patterns only in development
+    if (env.isDevelopment()) {
+      return devPatterns.some(pattern => pattern.test(origin));
+    }
+    
+    return false;
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Refresh-Token', 'X-Requested-With'],
   credentials: true,
@@ -89,35 +110,66 @@ app.route('/appointments', appointmentRoutes);
 app.route('/payments', paymentsRoute);
 app.route('/notifications', notificationsRoute);
 
-// Global error handler
+// Global error handler with enhanced logging and monitoring
 app.onError((err, c) => {
-  winstonLogger.error('Unhandled error', {
+  const logger = c.get('logger') as ContextLogger;
+  const correlationId = c.get('correlationId');
+  
+  // Enhanced error logging with context
+  logger?.error('Unhandled error', {
     error: err.message,
     stack: err.stack,
     path: c.req.path,
     method: c.req.method,
     userAgent: c.req.header('User-Agent'),
-    ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip')
+    ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
+    correlationId
   });
 
-  // Don't expose internal errors in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const message = isDevelopment ? err.message : 'Internal server error';
-  const details = isDevelopment ? { stack: err.stack } : undefined;
-
-  return c.json(errorResponse(500, message, details), 500);
+  // Use enhanced error handling
+  const errorDetails = handleError(err, logger);
+  
+  return c.json({
+    success: false,
+    error: errorDetails.message,
+    code: errorDetails.code,
+    correlationId: errorDetails.correlationId,
+    timestamp: errorDetails.timestamp,
+    ...(errorDetails.details && { details: errorDetails.details })
+  }, errorDetails.statusCode);
 });
 
-// 404 handler
+// 404 handler with enhanced logging
 app.notFound((c) => {
-  winstonLogger.warn('Route not found', {
+  const logger = c.get('logger') as ContextLogger;
+  const correlationId = c.get('correlationId');
+  
+  logger?.warn('404 - Route not found', {
     path: c.req.path,
     method: c.req.method,
     userAgent: c.req.header('User-Agent'),
     ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip')
   });
-
-  return c.json(errorResponse(404, 'Route not found'), 404);
+  
+  return c.json({
+    success: false,
+    error: 'Route not found',
+    code: 'ROUTE_NOT_FOUND',
+    correlationId,
+    timestamp: new Date().toISOString(),
+    details: {
+      path: c.req.path,
+      method: c.req.method,
+      availableRoutes: [
+        'GET /health',
+        'POST /auth/signup',
+        'POST /auth/signin',
+        'GET /services',
+        'POST /appointments',
+        'GET /schedules'
+      ]
+    }
+  }, HTTP_STATUS.NOT_FOUND);
 });
 
 // Graceful shutdown
@@ -154,6 +206,10 @@ process.on('uncaughtException', (error) => {
 // Database connection and server startup
 const startServer = async () => {
   try {
+    // Validate environment variables first
+    validateEnvironment();
+    winstonLogger.info('✅ Environment validation completed successfully');
+    
     // Connect to database
     await getDatabase();
     winstonLogger.info('✅ Database connection established successfully');
@@ -162,14 +218,14 @@ const startServer = async () => {
     cronService.startReminderJob();
     winstonLogger.info('⏰ Reminder cron job started successfully');
 
-    // Get port from environment or default to 3001 for Stripe webhook listening
-    const port = parseInt(process.env.PORT || '3001', 10);
+    // Get port from validated environment
+    const port = parseInt(env.PORT, 10);
     
     // Start server
     const server = Bun.serve({
       port,
       fetch: app.fetch,
-      development: process.env.NODE_ENV !== 'production'
+      development: env.isDevelopment()
     });
 
     winstonLogger.info(`🚀 Server starting on port ${port}`);
@@ -179,7 +235,7 @@ const startServer = async () => {
     winstonLogger.info(`⏰ Automated reminders enabled - checking every minute`);
     
     // Only log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (env.isDevelopment()) {
       console.log(`🚀 Server running at http://localhost:${port}`);
       console.log(`🔔 Stripe webhook endpoint: http://localhost:${port}/payments/webhook`);
       console.log(`📊 Health check: http://localhost:${port}/health`);

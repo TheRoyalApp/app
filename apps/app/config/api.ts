@@ -15,14 +15,14 @@ const getDevBaseURL = () => {
 
 // API Configuration
 export const API_CONFIG = {
-  // Development
+  // Development - reads from .env or falls back to staging
   development: {
-    baseURL: 'https://api-staging-d8aa.up.railway.app',
+    baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api-staging-d8aa.up.railway.app',
   },
   
-  // Production - UPDATE THIS WITH YOUR ACTUAL PRODUCTION URL
+  // Production - reads from .env or falls back to production domain
   production: {
-    baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.theroyalbarber.com',
+    baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://app.theroyalbarber.com',
   },
   
   // Get current environment
