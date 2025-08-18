@@ -1,17 +1,26 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 7.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "20.18.0",
+      "env": {
+        "NODE_ENV": "DEVELOPMENT"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
     },
     "preview": {
       "distribution": "internal",
+      "node": "20.18.0",
+      "env": {
+        "NODE_ENV": "DEVELOPMENT"
+      },
       "ios": {
         "resourceClass": "m-medium"
       },
@@ -20,6 +29,10 @@
       }
     },
     "production": {
+      "node": "20.18.0",
+      "env": {
+        "NODE_ENV": "DEVELOPMENT"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "distribution": "store"
@@ -35,11 +48,24 @@
       "ios": {
         "appleId": "your-apple-id@example.com",
         "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-apple-team-id",
+        "sku": "the-royal-barber-app"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production",
+        "releaseStatus": "completed"
+      }
+    },
+    "preview": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
         "appleTeamId": "your-apple-team-id"
       },
       "android": {
-        "serviceAccountKeyPath": "./path-to-your-service-account.json",
-        "track": "production"
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
       }
     }
   }
