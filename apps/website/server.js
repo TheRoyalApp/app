@@ -43,7 +43,8 @@ app.use('*.js', serveStatic({ root: './js', headers: staticOptions.headers }));
 // HTML page routes
 const htmlRoutes = [
   { path: '/privacy', file: 'privacy.html' },
-  { path: '/terms', file: 'terms.html' }
+  { path: '/terms', file: 'terms.html' },
+  { path: '/delete-account', file: 'delete-account.html' }
 ];
 
 htmlRoutes.forEach(({ path, file }) => {
@@ -70,7 +71,7 @@ const port = process.env.PORT || 3000;
 
 // Start server
 console.log(`🚀 Server running on http://localhost:${port}`);
-console.log(`📍 Routes: / /health /privacy /terms`);
+console.log(`📍 Routes: / /health /privacy /terms /delete-account`);
 
 serve({
   fetch: app.fetch,

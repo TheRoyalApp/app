@@ -1,5 +1,5 @@
 [variables]
-NODE_ENV = "production"
+NODE_ENV = "DEVELOPMENT"
 NIXPACKS_METADATA = "website"
 
 [phases.setup]
