@@ -80,7 +80,7 @@ export async function createService(serviceData: {
   }
 }
 
-// List all services
+// List all active services
 export async function listServices() {
   const res = {
     data: null as Service[] | null,
@@ -89,8 +89,8 @@ export async function listServices() {
 
   try {
     const db = await getDatabase();
-    const allServices = await db.select().from(services);
-    res.data = allServices as Service[];
+    const activeServices = await db.select().from(services).where(eq(services.isActive, true));
+    res.data = activeServices as Service[];
     return res;
   } catch (error) {
     console.error('Error listing services:', error);
@@ -115,7 +115,7 @@ export async function listServices() {
   }
 }
 
-// Get service by ID
+// Get active service by ID
 export async function getServiceById(id: string) {
   const res = {
     data: null as Service | null,
@@ -132,6 +132,11 @@ export async function getServiceById(id: string) {
     const [service] = await db.select().from(services).where(eq(services.id, id));
     
     if (!service) {
+      res.error = 'Service not found';
+      return res;
+    }
+
+    if (!service.isActive) {
       res.error = 'Service not found';
       return res;
     }
@@ -249,7 +254,7 @@ export async function updateService(id: string, updateData: Partial<Service>) {
   }
 }
 
-// Delete service
+// Soft delete service (set isActive to false)
 export async function deleteService(id: string) {
   const res = {
     data: null as Service | null,
@@ -264,10 +269,15 @@ export async function deleteService(id: string) {
 
     const db = await getDatabase();
     
-    // Check if service exists
+    // Check if service exists and is active
     const [existingService] = await db.select().from(services).where(eq(services.id, id));
     if (!existingService) {
       res.error = 'Service not found';
+      return res;
+    }
+
+    if (!existingService.isActive) {
+      res.error = 'Service is already inactive';
       return res;
     }
 
@@ -288,12 +298,20 @@ export async function deleteService(id: string) {
       }
     }
 
-    await db.delete(services).where(eq(services.id, id));
+    // Soft delete: set isActive to false
+    const [updatedService] = await db
+      .update(services)
+      .set({
+        isActive: false,
+        updatedAt: new Date()
+      })
+      .where(eq(services.id, id))
+      .returning();
 
-    res.data = existingService as Service; // Return the deleted service data
+    res.data = updatedService as Service; // Return the soft-deleted service data
     return res;
   } catch (error) {
-    console.error('Error deleting service:', error);
+    console.error('Error soft deleting service:', error);
     
     // Handle specific database errors
     if (error instanceof Error) {

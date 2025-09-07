@@ -121,7 +121,7 @@ servicesRouter.put('/:id', authMiddleware, staffOrAdminMiddleware, async (c: Con
     }
 });
 
-// Delete service (staff/admin only)
+// Deactivate service (staff/admin only)
 servicesRouter.delete('/:id', authMiddleware, staffOrAdminMiddleware, async (c: Context) => {
     try {
         const { id } = c.req.param();
@@ -139,12 +139,12 @@ servicesRouter.delete('/:id', authMiddleware, staffOrAdminMiddleware, async (c: 
         }
 
         if (!data) {
-            return c.json(errorResponse(500, 'Failed to delete service'), 500);
+            return c.json(errorResponse(500, 'Failed to deactivate service'), 500);
         }
 
-        return c.json(successResponse(200, { message: 'Service deleted successfully' }), 200);
+        return c.json(successResponse(200, { message: 'Service deactivated successfully' }), 200);
     } catch (error) {
-        console.error('Error deleting service:', error);
+        console.error('Error deactivating service:', error);
         return c.json(errorResponse(500, 'Internal server error'), 500);
     }
 });
