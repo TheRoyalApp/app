@@ -16,7 +16,8 @@ import type { TimeSlot } from '../schedules/schedules.d.js';
 import { sendAppointmentConfirmation, sendBarberNotification } from '../notifications/notifications.controller.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-05-28.basil',
+  // Use a stable, valid API version; or omit to use account default
+  apiVersion: '2024-06-20',
 });
 
 export const paymentsRoute = new Hono();
@@ -201,6 +202,31 @@ paymentsRoute.post('/checkout', async (c) => {
       return c.json(errorResponse(400, 'Missing required fields'), 400);
     }
 
+    // In production, require HTTPS return URLs (Stripe live mode requirement)
+    const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+    if (isProd) {
+      const httpsRegex = /^https:\/\//i;
+      const localhostRegex = /localhost|127\.0\.0\.1|::1/i;
+      if (!httpsRegex.test(successUrl) || !httpsRegex.test(cancelUrl)) {
+        return c.json(
+          errorResponse(
+            400,
+            'In production, successUrl and cancelUrl must be HTTPS URLs.'
+          ),
+          400
+        );
+      }
+      if (localhostRegex.test(successUrl) || localhostRegex.test(cancelUrl)) {
+        return c.json(
+          errorResponse(
+            400,
+            'In production, local URLs (localhost) are not allowed for Stripe Checkout.'
+          ),
+          400
+        );
+      }
+    }
+
     const db = await getDatabase();
     const [service] = await db.select().from(services).where(eq(services.id, serviceId));
     if (!service) {
@@ -236,6 +262,24 @@ paymentsRoute.post('/checkout', async (c) => {
 
     if (userId) {
       metadata.userId = userId;
+    }
+
+    // Optional: Validate that price exists in current Stripe mode (helps catch test/live mixups)
+    try {
+      await stripe.prices.retrieve(priceId);
+    } catch (e: any) {
+      console.error('Stripe price validation failed:', {
+        priceId,
+        code: e?.code,
+        message: e?.message,
+      });
+      return c.json(
+        errorResponse(
+          400,
+          'Invalid Stripe price for current environment. Ensure prices are created with the same Stripe key (live vs test).'
+        ),
+        400
+      );
     }
 
     // Create Stripe Checkout session
