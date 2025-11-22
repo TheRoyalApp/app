@@ -22,18 +22,18 @@ export async function sendPasswordResetEmail(email: string, token: string, userN
     const { error } = await resend.emails.send({
       from: RESEND_FROM_EMAIL,
       to: [email],
-      subject: 'Reset Your Password - The Royal Barber',
+      subject: 'Restablece tu Contraseña - The Royal Barber',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Password Reset Request</h2>
-          <p>Hello ${userName},</p>
-          <p>We received a request to reset your password. Your reset token is:</p>
+          <h2>Solicitud de Restablecimiento de Contraseña</h2>
+          <p>Hola ${userName},</p>
+          <p>Recibimos una solicitud para restablecer tu contraseña. Tu token de restablecimiento es:</p>
           <div style="background-color: #f4f4f4; padding: 15px; text-align: center; margin: 20px 0; font-weight: bold; font-size: 24px; letter-spacing: 2px;">
             ${token}
           </div>
-          <p>This token will expire in 1 hour.</p>
-          <p>If you did not request a password reset, please ignore this email.</p>
-          <p>Best regards,<br>The Royal Barber Team</p>
+          <p>Este token expirará en 1 hora.</p>
+          <p>Si no solicitaste un restablecimiento de contraseña, por favor ignora este correo.</p>
+          <p>Saludos cordiales,<br>El equipo de The Royal Barber</p>
         </div>
       `,
     });
