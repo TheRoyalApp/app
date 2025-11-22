@@ -1,15 +1,17 @@
 import type { Context } from 'hono';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { getValidatedBody } from '../middleware/validation.middleware.js';
 import { createUserSchema, loginSchema, refreshTokenSchema } from '../helpers/validation.schemas.js';
 import { getDatabase } from '../db/connection.js';
-import { users } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { users, passwordResetTokens } from '../db/schema.js';
+import { eq, and, gt } from 'drizzle-orm';
 import winstonLogger from '../helpers/logger.js';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
-import type { CreateUserRequest, LoginRequest, RefreshTokenRequest } from './auth.d.js';
+import type { CreateUserRequest, LoginRequest, RefreshTokenRequest, RequestPasswordResetRequest, VerifyResetTokenRequest, ResetPasswordRequest } from './auth.d.js';
+import { sendPasswordResetEmail } from '../helpers/email.helper.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
@@ -312,5 +314,134 @@ export async function deleteOwnAccount(c: Context) {
     return c.json(successResponse(200, { message: 'Account deleted successfully' }), 200);
   } catch (error) {
     return c.json(errorResponse(500, 'Failed to delete account'), 500);
+  }
+}
+
+export async function requestPasswordReset(c: Context) {
+  try {
+    const validatedData = getValidatedBody<RequestPasswordResetRequest>(c);
+    const db = await getDatabase();
+    
+    // Find user by email
+    const userResult = await db.select().from(users).where(eq(users.email, validatedData.email)).limit(1);
+    
+    // Always return success even if user doesn't exist to prevent enumeration
+    if (userResult.length === 0) {
+      winstonLogger.info('Password reset requested for non-existent email', { email: validatedData.email });
+      return c.json(successResponse(200, { message: 'If your email exists in our system, you will receive a password reset link.' }));
+    }
+
+    const user = userResult[0];
+    
+    if (!user) {
+      winstonLogger.error('User not found after length check in password reset');
+      return c.json(errorResponse(500, 'Internal server error'), 500);
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Store token
+    await db.insert(passwordResetTokens).values({
+      userId: user.id,
+      token: token,
+      expiresAt: expiresAt
+    });
+
+    // Send email
+    const emailSent = await sendPasswordResetEmail(
+      user.email,
+      token,
+      user.firstName
+    );
+
+    if (!emailSent) {
+        winstonLogger.error('Failed to send password reset email', { userId: user.id });
+        // Still return success to client
+    }
+
+    winstonLogger.info('Password reset requested', { userId: user.id });
+    
+    return c.json(successResponse(200, { message: 'If your email exists in our system, you will receive a password reset link.' }));
+
+  } catch (error) {
+    winstonLogger.error('Request password reset error', error);
+    return c.json(errorResponse(500, 'Failed to process request'), 500);
+  }
+}
+
+export async function verifyResetToken(c: Context) {
+  try {
+    const validatedData = getValidatedBody<VerifyResetTokenRequest>(c);
+    const db = await getDatabase();
+
+    const tokenResult = await db.select()
+      .from(passwordResetTokens)
+      .where(and(
+        eq(passwordResetTokens.token, validatedData.token),
+        eq(passwordResetTokens.used, false),
+        gt(passwordResetTokens.expiresAt, new Date())
+      ))
+      .limit(1);
+
+    if (tokenResult.length === 0) {
+      return c.json(errorResponse(400, 'Invalid or expired token'), 400);
+    }
+
+    return c.json(successResponse(200, { valid: true }));
+
+  } catch (error) {
+    winstonLogger.error('Verify reset token error', error);
+    return c.json(errorResponse(500, 'Failed to verify token'), 500);
+  }
+}
+
+export async function resetPassword(c: Context) {
+  try {
+    const validatedData = getValidatedBody<ResetPasswordRequest>(c);
+    const db = await getDatabase();
+
+    // Verify token again
+    const tokenResult = await db.select()
+      .from(passwordResetTokens)
+      .where(and(
+        eq(passwordResetTokens.token, validatedData.token),
+        eq(passwordResetTokens.used, false),
+        gt(passwordResetTokens.expiresAt, new Date())
+      ))
+      .limit(1);
+
+    if (tokenResult.length === 0) {
+      return c.json(errorResponse(400, 'Invalid or expired token'), 400);
+    }
+
+    const resetToken = tokenResult[0];
+    
+    if (!resetToken) {
+      winstonLogger.error('Token not found after length check in reset password');
+      return c.json(errorResponse(400, 'Invalid or expired token'), 400);
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(validatedData.newPassword, 10);
+
+    // Update user password
+    await db.update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, resetToken.userId));
+
+    // Mark token as used
+    await db.update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, resetToken.id));
+
+    winstonLogger.info('Password reset successfully', { userId: resetToken.userId });
+
+    return c.json(successResponse(200, { message: 'Password reset successfully' }));
+
+  } catch (error) {
+    winstonLogger.error('Reset password error', error);
+    return c.json(errorResponse(500, 'Failed to reset password'), 500);
   }
 }

@@ -58,6 +58,20 @@ export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required')
 });
 
+// Password Reset schemas
+export const requestPasswordResetSchema = z.object({
+  email: emailSchema
+});
+
+export const verifyResetTokenSchema = z.object({
+  token: z.string().min(1, 'Token is required')
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  newPassword: passwordSchema
+});
+
 // Service schemas
 export const createServiceSchema = z.object({
   name: z.string()
@@ -156,6 +170,9 @@ export const schemas = {
   createUser: createUserSchema,
   login: loginSchema,
   refreshToken: refreshTokenSchema,
+  requestPasswordReset: requestPasswordResetSchema,
+  verifyResetToken: verifyResetTokenSchema,
+  resetPassword: resetPasswordSchema,
   createService: createServiceSchema,
   createSchedule: createScheduleSchema,
   updateSchedule: updateScheduleSchema,
@@ -164,4 +181,4 @@ export const schemas = {
   updateAppointmentStatus: updateAppointmentStatusSchema,
   pagination: paginationSchema,
   search: searchSchema
-}; 
+};

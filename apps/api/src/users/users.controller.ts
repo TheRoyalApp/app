@@ -1,6 +1,7 @@
 import { getDatabase, users } from '../db/connection.js';
 import { eq, and } from 'drizzle-orm';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
+import { testPushNotification } from '../helpers/expo-push.helper.js';
 import winstonLogger from '../helpers/logger.js';
 import type { User, UserResponse } from './users.d';
 import { hasBarberSchedules } from '../schedules/schedules.controller.js';
@@ -286,5 +287,173 @@ export async function updateUserRole(id: string, role: 'customer' | 'staff' | 'a
         console.error('Error updating user role:', error);
         res.error = 'Failed to update user role';
         return res;
+    }
+}
+
+/**
+ * Register or update user's Expo push token
+ */
+export async function registerPushToken(userId: string, expoPushToken: string): Promise<{
+    success: boolean;
+    error?: string;
+}> {
+    try {
+        const db = await getDatabase();
+
+        // Verify user exists
+        const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (user.length === 0) {
+            return {
+                success: false,
+                error: 'User not found'
+            };
+        }
+
+        // Update user's push token
+        await db
+            .update(users)
+            .set({ 
+                expoPushToken,
+                pushNotificationsEnabled: true,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, userId));
+
+        winstonLogger.info('Push token registered successfully', {
+            userId,
+            hasToken: !!expoPushToken
+        });
+
+        return { success: true };
+    } catch (error) {
+        winstonLogger.error('Error registering push token', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            userId
+        });
+
+        return {
+            success: false,
+            error: 'Failed to register push token'
+        };
+    }
+}
+
+/**
+ * Update user's push notification preferences
+ */
+export async function updatePushNotificationPreferences(
+    userId: string, 
+    pushNotificationsEnabled: boolean
+): Promise<{
+    success: boolean;
+    error?: string;
+}> {
+    try {
+        const db = await getDatabase();
+
+        // Verify user exists
+        const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (user.length === 0) {
+            return {
+                success: false,
+                error: 'User not found'
+            };
+        }
+
+        // Update user's push notification preferences
+        await db
+            .update(users)
+            .set({ 
+                pushNotificationsEnabled,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, userId));
+
+        winstonLogger.info('Push notification preferences updated', {
+            userId,
+            pushNotificationsEnabled
+        });
+
+        return { success: true };
+    } catch (error) {
+        winstonLogger.error('Error updating push notification preferences', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            userId
+        });
+
+        return {
+            success: false,
+            error: 'Failed to update push notification preferences'
+        };
+    }
+}
+
+/**
+ * Test push notification for a user
+ */
+export async function testUserPushNotification(userId: string, message: string): Promise<{
+    success: boolean;
+    error?: string;
+    messageId?: string;
+}> {
+    try {
+        const db = await getDatabase();
+
+        // Get user's push token
+        const user = await db
+            .select({
+                id: users.id,
+                expoPushToken: users.expoPushToken,
+                pushNotificationsEnabled: users.pushNotificationsEnabled,
+                firstName: users.firstName
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        if (user.length === 0) {
+            return {
+                success: false,
+                error: 'User not found'
+            };
+        }
+
+        const userData = user[0];
+
+        if (!userData.expoPushToken) {
+            return {
+                success: false,
+                error: 'User has no push token registered'
+            };
+        }
+
+        if (!userData.pushNotificationsEnabled) {
+            return {
+                success: false,
+                error: 'User has push notifications disabled'
+            };
+        }
+
+        // Send test push notification
+        const result = await testPushNotification(userData.expoPushToken, message);
+
+        if (result.success) {
+            winstonLogger.info('Test push notification sent successfully', {
+                userId,
+                messageId: result.messageId
+            });
+        }
+
+        return result;
+    } catch (error) {
+        winstonLogger.error('Error sending test push notification', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            userId
+        });
+
+        return {
+            success: false,
+            error: 'Failed to send test push notification'
+        };
     }
 }

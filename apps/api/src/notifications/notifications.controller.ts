@@ -2,6 +2,7 @@ import { getDatabase } from "../db/connection.js";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { appointments, users, services, payments } from "../db/schema.js";
 import { sendWhatsappReminder, generateConfirmationMessage, generateReminderMessage, generateBarberNotificationMessage } from "../helpers/whatsapp.helper.js";
+import { sendPushNotification, generateAppointmentConfirmationNotification } from "../helpers/expo-push.helper.js";
 import winstonLogger from "../helpers/logger.js";
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
 import { formatAppointmentDateTime } from '../helpers/date.helper.js';
@@ -30,6 +31,8 @@ export async function sendAppointmentConfirmation(appointmentId: string, db?: an
         customerPhone: users.phone,
         customerName: users.firstName,
         customerLastName: users.lastName,
+        customerExpoPushToken: users.expoPushToken,
+        customerPushNotificationsEnabled: users.pushNotificationsEnabled,
         serviceName: services.name
       })
       .from(appointments)
@@ -84,16 +87,58 @@ export async function sendAppointmentConfirmation(appointmentId: string, db?: an
     });
 
     // Send WhatsApp message
-    const result = await sendWhatsappReminder(appointment.customerPhone, message);
+    const whatsappResult = await sendWhatsappReminder(appointment.customerPhone, message);
 
-    if (result.success) {
-      winstonLogger.info('Appointment confirmation sent successfully', {
+    // Send push notification if user has push notifications enabled and has a token
+    let pushResult = null;
+    if (appointment.customerExpoPushToken && appointment.customerPushNotificationsEnabled) {
+      try {
+        const pushNotification = generateAppointmentConfirmationNotification({
+          serviceName: appointment.serviceName || 'Servicio',
+          appointmentDate: formatAppointmentDateTime(appointment.appointmentDate, appointment.timeSlot),
+          timeSlot: appointment.timeSlot,
+          barberName: barberName,
+          customerName: appointment.customerName || 'Cliente'
+        });
+
+        pushResult = await sendPushNotification(appointment.customerExpoPushToken, pushNotification);
+        
+        if (pushResult.success) {
+          winstonLogger.info('Push notification sent successfully', {
+            appointmentId,
+            messageId: pushResult.messageId
+          });
+        } else {
+          winstonLogger.warn('Push notification failed', {
+            appointmentId,
+            error: pushResult.error
+          });
+        }
+      } catch (pushError) {
+        winstonLogger.error('Error sending push notification', {
+          appointmentId,
+          error: pushError instanceof Error ? pushError.message : 'Unknown error'
+        });
+      }
+    } else {
+      winstonLogger.info('Skipping push notification', {
         appointmentId,
-        messageId: result.messageId
+        hasToken: !!appointment.customerExpoPushToken,
+        pushEnabled: appointment.customerPushNotificationsEnabled
       });
     }
 
-    return result;
+    // Return WhatsApp result as primary result, but log push notification status
+    if (whatsappResult.success) {
+      winstonLogger.info('Appointment confirmation sent successfully', {
+        appointmentId,
+        whatsappMessageId: whatsappResult.messageId,
+        pushNotificationSent: pushResult?.success || false,
+        pushNotificationError: pushResult?.error || null
+      });
+    }
+
+    return whatsappResult;
 
   } catch (error) {
     winstonLogger.error('Error sending appointment confirmation', {

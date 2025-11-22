@@ -39,4 +39,4 @@ todo.md
 
 # node_modules (npm install)
 node_modules
-package-lock.json
+package-lock.jsonbackup_*.sql

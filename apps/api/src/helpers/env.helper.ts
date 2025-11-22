@@ -13,10 +13,10 @@ interface EnvironmentConfig {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
   
-  // Twilio Configuration
-  TWILIO_ACCOUNT_SID: string;
-  TWILIO_AUTH_TOKEN: string;
-  TWILIO_PHONE_NUMBER: string;
+  // Twilio Configuration (optional - only needed for SMS)
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_PHONE_NUMBER?: string;
   
   // Server Configuration
   NODE_ENV: string;
@@ -28,6 +28,10 @@ interface EnvironmentConfig {
   DEBUG_MODE?: string;
   LOG_SMS_CODES?: string;
   ENABLE_NOTIFICATIONS?: string;
+  
+  // Resend Configuration (optional - only needed for email)
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
 }
 
 const requiredEnvVars: (keyof EnvironmentConfig)[] = [
@@ -37,9 +41,6 @@ const requiredEnvVars: (keyof EnvironmentConfig)[] = [
   'INTERNAL_API_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
-  'TWILIO_ACCOUNT_SID',
-  'TWILIO_AUTH_TOKEN',
-  'TWILIO_PHONE_NUMBER',
   'NODE_ENV',
   'PORT'
 ];
@@ -49,7 +50,12 @@ const optionalEnvVars: (keyof EnvironmentConfig)[] = [
   'DISABLE_SMS',
   'DEBUG_MODE',
   'LOG_SMS_CODES',
-  'ENABLE_NOTIFICATIONS'
+  'ENABLE_NOTIFICATIONS',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_PHONE_NUMBER',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL'
 ];
 
 /**
@@ -154,9 +160,9 @@ export const env = {
   get INTERNAL_API_SECRET() { return getEnvironmentConfig().INTERNAL_API_SECRET; },
   get STRIPE_SECRET_KEY() { return getEnvironmentConfig().STRIPE_SECRET_KEY; },
   get STRIPE_WEBHOOK_SECRET() { return getEnvironmentConfig().STRIPE_WEBHOOK_SECRET; },
-  get TWILIO_ACCOUNT_SID() { return getEnvironmentConfig().TWILIO_ACCOUNT_SID; },
-  get TWILIO_AUTH_TOKEN() { return getEnvironmentConfig().TWILIO_AUTH_TOKEN; },
-  get TWILIO_PHONE_NUMBER() { return getEnvironmentConfig().TWILIO_PHONE_NUMBER; },
+  get TWILIO_ACCOUNT_SID() { return getEnvironmentConfig().TWILIO_ACCOUNT_SID || ''; },
+  get TWILIO_AUTH_TOKEN() { return getEnvironmentConfig().TWILIO_AUTH_TOKEN || ''; },
+  get TWILIO_PHONE_NUMBER() { return getEnvironmentConfig().TWILIO_PHONE_NUMBER || ''; },
   get NODE_ENV() { return getEnvironmentConfig().NODE_ENV; },
   get PORT() { return getEnvironmentConfig().PORT; },
   get API_BASE_URL() { return getEnvironmentConfig().API_BASE_URL; },

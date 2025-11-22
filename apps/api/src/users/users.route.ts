@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
-import { getAllUsers, getUserById, updateUser, deleteUser, searchUserByEmail, updateUserRole } from './users.controller.js';
+import { getAllUsers, getUserById, updateUser, deleteUser, searchUserByEmail, updateUserRole, registerPushToken, updatePushNotificationPreferences, testUserPushNotification } from './users.controller.js';
 import { createUser } from '../use-cases/create-user.js';
 import type { User } from './users.d.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.middleware.js';
@@ -287,6 +287,96 @@ usersRouter.put('/:id/role', authMiddleware, adminMiddleware, async (c: Context)
     } catch (error) {
         console.error('Error updating user role:', error);
         return c.json(errorResponse(500, 'Failed to update user role'), 500);
+    }
+});
+
+// Register push token for current user
+usersRouter.post('/push-token', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { expoPushToken } = await c.req.json();
+
+        if (!expoPushToken) {
+            return c.json(errorResponse(400, 'Expo push token is required'), 400);
+        }
+
+        const result = await registerPushToken(user.id, expoPushToken);
+
+        if (!result.success) {
+            return c.json(errorResponse(400, result.error || 'Failed to register push token'), 400);
+        }
+
+        return c.json(successResponse(200, { message: 'Push token registered successfully' }), 200);
+    } catch (error) {
+        console.error('Error registering push token:', error);
+        return c.json(errorResponse(500, 'Failed to register push token'), 500);
+    }
+});
+
+// Update push notification preferences for current user
+usersRouter.put('/push-preferences', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { pushNotificationsEnabled } = await c.req.json();
+
+        if (typeof pushNotificationsEnabled !== 'boolean') {
+            return c.json(errorResponse(400, 'pushNotificationsEnabled must be a boolean'), 400);
+        }
+
+        const result = await updatePushNotificationPreferences(user.id, pushNotificationsEnabled);
+
+        if (!result.success) {
+            return c.json(errorResponse(400, result.error || 'Failed to update push notification preferences'), 400);
+        }
+
+        return c.json(successResponse(200, { 
+            message: 'Push notification preferences updated successfully',
+            pushNotificationsEnabled 
+        }), 200);
+    } catch (error) {
+        console.error('Error updating push notification preferences:', error);
+        return c.json(errorResponse(500, 'Failed to update push notification preferences'), 500);
+    }
+});
+
+// Test push notification for current user
+usersRouter.post('/test-push', authMiddleware, async (c: Context) => {
+    try {
+        const user = c.get('user');
+        
+        if (!user || !user.id) {
+            return c.json(errorResponse(401, 'User not authenticated'), 401);
+        }
+
+        const { message } = await c.req.json();
+
+        if (!message) {
+            return c.json(errorResponse(400, 'Message is required'), 400);
+        }
+
+        const result = await testUserPushNotification(user.id, message);
+
+        if (!result.success) {
+            return c.json(errorResponse(400, result.error || 'Failed to send test push notification'), 400);
+        }
+
+        return c.json(successResponse(200, { 
+            message: 'Test push notification sent successfully',
+            messageId: result.messageId
+        }), 200);
+    } catch (error) {
+        console.error('Error sending test push notification:', error);
+        return c.json(errorResponse(500, 'Failed to send test push notification'), 500);
     }
 });
 

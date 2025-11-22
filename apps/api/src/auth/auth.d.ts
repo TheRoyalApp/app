@@ -29,3 +29,16 @@ export interface LoginRequest {
 export interface RefreshTokenRequest {
     refreshToken: string;
 }
+
+export interface RequestPasswordResetRequest {
+    email: string;
+}
+
+export interface VerifyResetTokenRequest {
+    token: string;
+}
+
+export interface ResetPasswordRequest {
+    token: string;
+    newPassword: string;
+}

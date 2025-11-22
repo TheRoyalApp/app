@@ -17,6 +17,8 @@ export const users = pgTable('users', {
   isAdmin: boolean('is_admin').default(false),
   role: userRoleEnum('role').default('customer'),
   refreshToken: text('refresh_token'),
+  expoPushToken: text('expo_push_token'),
+  pushNotificationsEnabled: boolean('push_notifications_enabled').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -34,6 +36,7 @@ export const services = pgTable('services', {
   stripePriceId: text('stripe_price_id'),
   stripeAdvancePriceId: text('stripe_advance_price_id'),
   stripeCurrency: text('stripe_currency').default('mxn'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -75,4 +78,14 @@ export const payments = pgTable('payments', {
   transactionId: text('transaction_id'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-}); 
+});
+
+// Password Reset Tokens table
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  used: boolean('used').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
