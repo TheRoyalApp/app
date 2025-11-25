@@ -38,7 +38,8 @@
     "seed:schedules": "bun run src/db/seed-schedules.ts",
     "seed:all": "bun run src/db/seed-users.ts && bun run src/db/seed-services.ts && bun run src/scripts/setup-stripe-products.ts && bun run src/db/seed-schedules.ts",
     "## Utilities ##": "",
-    "cron:reminders": "bun run src/scripts/reminder-cron.ts"
+    "cron:reminders": "bun run src/scripts/reminder-cron.ts",
+    "test:email": "bun run src/scripts/test-email.ts"
   },
   "peerDependencies": {
     "typescript": "^5"

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { Buffer } from 'node:buffer';
 import { getDatabase } from '../db/connection.js';
 import { services, payments, appointments, users } from '../db/schema.js';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
@@ -313,7 +314,12 @@ paymentsRoute.post('/webhook', async (c) => {
   console.log(`🔔 [${timestamp}] Webhook received`);
   
   const signature = c.req.header('stripe-signature');
-  const body = await c.req.text();
+  
+  // IMPORTANT: For Stripe webhooks, we must use the RAW request clone to get exact bytes
+  // Using c.req.text() or c.req.json() will modify the body and break signature verification
+  const rawBody = await c.req.raw.arrayBuffer();
+  const bodyBuffer = Buffer.from(rawBody);
+  const body = bodyBuffer.toString('utf8');
   
   // Log webhook receipt for debugging
   console.log(`📋 [${timestamp}] Webhook details:`, {
@@ -324,7 +330,9 @@ paymentsRoute.post('/webhook', async (c) => {
       'content-type': c.req.header('content-type'),
       'user-agent': c.req.header('user-agent'),
       'stripe-signature': signature ? 'present' : 'missing'
-    }
+    },
+    secretConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+    secretLength: process.env.STRIPE_WEBHOOK_SECRET?.length || 0
   });
 
   console.log('Webhook headers:', {
@@ -355,11 +363,20 @@ paymentsRoute.post('/webhook', async (c) => {
         return c.json(errorResponse(400, 'Missing Stripe signature'), 400);
       }
 
-      event = await stripe.webhooks.constructEventAsync(
-        body,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET || ''
-      );
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        console.error('Missing STRIPE_WEBHOOK_SECRET environment variable');
+        // Still try to process if dev, otherwise fail
+        if (isDevelopmentEnv()) {
+             console.log('Development mode: Attempting parse without verification due to missing secret');
+             event = JSON.parse(body) as Stripe.Event;
+        } else {
+             return c.json(errorResponse(500, 'Webhook configuration error'), 500);
+        }
+      } else {
+        // Construct the event using the raw body string
+        // Use the raw byte buffer to avoid any newline/encoding mutations
+        event = await stripe.webhooks.constructEventAsync(bodyBuffer, signature, process.env.STRIPE_WEBHOOK_SECRET);
+      }
     }
     
     console.log('✅ Webhook event parsed successfully:', {
@@ -369,6 +386,17 @@ paymentsRoute.post('/webhook', async (c) => {
     });
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err);
+    if (err instanceof Error) {
+        console.error('Error message:', err.message);
+        // Log signature details for debugging (be careful not to log full secrets in prod)
+        if (isDevelopmentEnv()) {
+            console.error('Debug info:', {
+                signatureHeader: signature,
+                secretPrefix: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 8) + '...',
+                bodyLength: body.length
+            });
+        }
+    }
     return c.json(errorResponse(400, 'Invalid signature'), 400);
   }
 

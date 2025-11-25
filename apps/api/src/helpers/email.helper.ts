@@ -2,25 +2,55 @@ import { Resend } from 'resend';
 import winstonLogger from './logger.js';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL;
+const NODE_ENV = process.env.NODE_ENV;
 
 let resend: Resend | null = null;
+let emailConfigError: string | null = null;
 
-if (RESEND_API_KEY) {
-  resend = new Resend(RESEND_API_KEY);
+// Validate email configuration
+if (!RESEND_API_KEY) {
+  emailConfigError = 'RESEND_API_KEY not found in environment variables';
+  winstonLogger.error('Email configuration error', { error: emailConfigError });
+} else if (!RESEND_FROM_EMAIL) {
+  emailConfigError = 'RESEND_FROM_EMAIL not found in environment variables';
+  winstonLogger.error('Email configuration error', { 
+    error: emailConfigError,
+    hint: 'Set RESEND_FROM_EMAIL to a verified domain email (e.g., noreply@yourdomain.com)'
+  });
 } else {
-  winstonLogger.warn('RESEND_API_KEY not found. Email sending will be disabled.');
+  try {
+    resend = new Resend(RESEND_API_KEY);
+    winstonLogger.info('Resend email service initialized successfully', { 
+      fromEmail: RESEND_FROM_EMAIL,
+      environment: NODE_ENV 
+    });
+  } catch (error) {
+    emailConfigError = 'Failed to initialize Resend service';
+    winstonLogger.error('Resend initialization error', { error });
+  }
 }
 
 export async function sendPasswordResetEmail(email: string, token: string, userName: string): Promise<boolean> {
-  if (!resend) {
-    winstonLogger.warn('Cannot send password reset email: Resend not initialized');
+  if (!resend || emailConfigError) {
+    winstonLogger.error('Cannot send password reset email', { 
+      reason: emailConfigError || 'Resend not initialized',
+      recipientEmail: email,
+      hasApiKey: !!RESEND_API_KEY,
+      hasFromEmail: !!RESEND_FROM_EMAIL,
+      fromEmail: RESEND_FROM_EMAIL
+    });
     return false;
   }
 
   try {
-    const { error } = await resend.emails.send({
-      from: RESEND_FROM_EMAIL,
+    winstonLogger.info('Attempting to send password reset email', { 
+      to: email, 
+      from: RESEND_FROM_EMAIL 
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: RESEND_FROM_EMAIL!,
       to: [email],
       subject: 'Restablece tu Contraseña - The Royal Barber',
       html: `
@@ -39,15 +69,49 @@ export async function sendPasswordResetEmail(email: string, token: string, userN
     });
 
     if (error) {
-      winstonLogger.error('Failed to send password reset email', error);
+      winstonLogger.error('Resend API returned an error', { 
+        error,
+        errorMessage: error.message,
+        errorName: error.name,
+        recipientEmail: email,
+        fromEmail: RESEND_FROM_EMAIL
+      });
       return false;
     }
 
-    winstonLogger.info('Password reset email sent successfully', { email });
+    winstonLogger.info('Password reset email sent successfully', { 
+      email,
+      emailId: data?.id 
+    });
     return true;
-  } catch (error) {
-    winstonLogger.error('Error sending password reset email', error);
+  } catch (error: any) {
+    winstonLogger.error('Exception while sending password reset email', { 
+      error: error?.message || error,
+      stack: error?.stack,
+      recipientEmail: email,
+      fromEmail: RESEND_FROM_EMAIL
+    });
     return false;
   }
+}
+
+/**
+ * Check if email service is configured and ready
+ */
+export function isEmailConfigured(): boolean {
+  return resend !== null && emailConfigError === null;
+}
+
+/**
+ * Get email configuration status for health checks
+ */
+export function getEmailStatus() {
+  return {
+    configured: isEmailConfigured(),
+    hasApiKey: !!RESEND_API_KEY,
+    hasFromEmail: !!RESEND_FROM_EMAIL,
+    fromEmail: RESEND_FROM_EMAIL || 'not set',
+    error: emailConfigError
+  };
 }
 

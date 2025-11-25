@@ -12,6 +12,7 @@ import { validateEnvironment, env } from './helpers/env.helper.js';
 import { correlationMiddleware, requestLoggingMiddleware } from './middleware/logging.middleware.js';
 import { handleError, HTTP_STATUS } from './helpers/error.helper.js';
 import { ContextLogger } from './helpers/logger.js';
+import { getEmailStatus } from './helpers/email.helper.js';
 
 // Import routes
 import authRoutes from './auth/auth.route.js';
@@ -77,12 +78,25 @@ app.use('*', rateLimits.api);
 
 // Health check endpoint
 app.get('/health', (c) => {
+  const emailStatus = getEmailStatus();
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    services: {
+      email: {
+        configured: emailStatus.configured,
+        status: emailStatus.configured ? 'operational' : 'not configured',
+        ...(env.isDevelopment() && { 
+          hasApiKey: emailStatus.hasApiKey,
+          hasFromEmail: emailStatus.hasFromEmail,
+          fromEmail: emailStatus.fromEmail,
+          error: emailStatus.error
+        })
+      }
+    }
   });
 });
 
@@ -213,6 +227,23 @@ const startServer = async () => {
     // Connect to database
     await getDatabase();
     winstonLogger.info('✅ Database connection established successfully');
+
+    // Check email configuration
+    const emailStatus = getEmailStatus();
+    if (emailStatus.configured) {
+      winstonLogger.info('✅ Email service configured successfully', {
+        fromEmail: emailStatus.fromEmail
+      });
+    } else {
+      winstonLogger.error('❌ Email service NOT configured', {
+        hasApiKey: emailStatus.hasApiKey,
+        hasFromEmail: emailStatus.hasFromEmail,
+        error: emailStatus.error
+      });
+      if (env.isProduction()) {
+        winstonLogger.error('⚠️  CRITICAL: Email service must be configured in production!');
+      }
+    }
 
     // Start the reminder cron job
     cronService.startReminderJob();
