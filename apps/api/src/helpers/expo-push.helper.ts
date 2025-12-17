@@ -59,29 +59,39 @@ export async function sendPushNotification(
     if (ticket && ticket.length > 0) {
       const pushTicket = ticket[0];
       
-      if (pushTicket.status === 'ok') {
+      if (pushTicket && pushTicket.status === 'ok') {
+        const ticketId = 'id' in pushTicket ? pushTicket.id : 'unknown';
         winstonLogger.info('Push notification sent successfully', {
-          ticketId: pushTicket.id,
+          ticketId,
           to: expoPushToken
         });
         
         return {
           success: true,
-          messageId: pushTicket.id,
-          ticketId: pushTicket.id
+          messageId: ticketId,
+          ticketId: ticketId
         };
-      } else {
-        const error = `Push notification failed: ${pushTicket.message || 'Unknown error'}`;
+      } else if (pushTicket && pushTicket.status === 'error') {
+        const error = `Push notification failed: ${'message' in pushTicket ? pushTicket.message : 'Unknown error'}`;
+        const ticketId = 'id' in pushTicket ? pushTicket.id : 'unknown';
         winstonLogger.error('Push notification failed', {
           error,
           to: expoPushToken,
-          ticketId: pushTicket.id
+          ticketId
         });
         
         return {
           success: false,
           error,
-          ticketId: pushTicket.id
+          ticketId: ticketId as string
+        };
+      } else {
+        const error = 'Unknown ticket status';
+        winstonLogger.error('Push notification failed', { error, to: expoPushToken });
+        
+        return {
+          success: false,
+          error
         };
       }
     } else {
@@ -167,19 +177,28 @@ export async function sendPushNotificationToMultiple(
       const ticket = tickets[i];
       const token = validTokens[i];
       
-      if (ticket.status === 'ok') {
+      if (ticket && ticket.status === 'ok') {
+        const ticketId = 'id' in ticket ? ticket.id : 'unknown';
         results.push({
           success: true,
-          messageId: ticket.id,
-          ticketId: ticket.id
+          messageId: ticketId,
+          ticketId: ticketId
         });
         totalSent++;
-      } else {
-        const error = `Push notification failed: ${ticket.message || 'Unknown error'}`;
+      } else if (ticket && ticket.status === 'error') {
+        const error = `Push notification failed: ${'message' in ticket ? ticket.message : 'Unknown error'}`;
+        const ticketId = 'id' in ticket ? ticket.id : 'unknown';
         results.push({
           success: false,
           error,
-          ticketId: ticket.id
+          ticketId: ticketId as string
+        });
+        totalFailed++;
+      } else {
+        results.push({
+          success: false,
+          error: 'Unknown ticket status',
+          ticketId: 'unknown'
         });
         totalFailed++;
       }
@@ -225,14 +244,15 @@ export function generateAppointmentConfirmationNotification(appointmentData: {
 }): PushNotificationData {
   return {
     title: '¡Cita Confirmada! 🎉',
-    body: `Tu cita para ${appointmentData.serviceName} está confirmada para ${appointmentData.appointmentDate} a las ${appointmentData.timeSlot} con ${appointmentData.barberName}. ¡Te esperamos!`,
+    body: `Tu cita para ${appointmentData.serviceName} está confirmada para ${appointmentData.appointmentDate} con ${appointmentData.barberName}. ¡Te esperamos!`,
     data: {
       type: 'appointment_confirmation',
       appointmentId: appointmentData.serviceName, // This should be the actual appointment ID
       serviceName: appointmentData.serviceName,
       appointmentDate: appointmentData.appointmentDate,
       timeSlot: appointmentData.timeSlot,
-      barberName: appointmentData.barberName
+      barberName: appointmentData.barberName,
+      timestamp: Date.now(), // Add timestamp for cache busting
     },
     sound: 'default',
     badge: 1,
@@ -268,6 +288,101 @@ export function generateAppointmentReminderNotification(appointmentData: {
 }
 
 /**
+ * Generate barber notification push notification data
+ */
+export function generateBarberNotificationPushNotification(appointmentData: {
+  customerName: string;
+  customerLastName: string;
+  serviceName: string;
+  appointmentDate: string;
+  timeSlot: string;
+  customerPhone: string;
+  paymentAmount?: string;
+}): PushNotificationData {
+  const customerFullName = `${appointmentData.customerName} ${appointmentData.customerLastName}`.trim();
+  
+  return {
+    title: '🎉 Nueva Cita Reservada',
+    body: `${customerFullName} ha reservado una cita para ${appointmentData.serviceName} ${appointmentData.appointmentDate}`,
+    data: {
+      type: 'barber_appointment_created',
+      customerName: customerFullName,
+      serviceName: appointmentData.serviceName,
+      appointmentDate: appointmentData.appointmentDate,
+      timeSlot: appointmentData.timeSlot,
+      customerPhone: appointmentData.customerPhone,
+      paymentAmount: appointmentData.paymentAmount
+    },
+    sound: 'default',
+    badge: 1,
+    channelId: 'barber_notifications'
+  };
+}
+
+/**
+ * Generate customer notification for rescheduled appointment
+ */
+export function generateAppointmentRescheduleConfirmationNotification(appointmentData: {
+  serviceName: string;
+  appointmentDate: string;
+  timeSlot: string;
+  barberName: string;
+  customerName: string;
+}): PushNotificationData {
+  return {
+    title: '📅 Cita Reprogramada',
+    body: `Tu cita para ${appointmentData.serviceName} ha sido reprogramada para ${appointmentData.appointmentDate} con ${appointmentData.barberName}. ¡Te esperamos!`,
+    data: {
+      type: 'appointment_rescheduled',
+      serviceName: appointmentData.serviceName,
+      appointmentDate: appointmentData.appointmentDate,
+      timeSlot: appointmentData.timeSlot,
+      barberName: appointmentData.barberName,
+      timestamp: Date.now(),
+    },
+    sound: 'default',
+    badge: 1,
+    channelId: 'appointments'
+  };
+}
+
+/**
+ * Generate barber notification for rescheduled appointment
+ */
+export function generateBarberRescheduleNotificationPushNotification(appointmentData: {
+  customerName: string;
+  customerLastName: string;
+  serviceName: string;
+  appointmentDate: string;
+  timeSlot: string;
+  customerPhone: string;
+  paymentAmount?: string;
+  originalDate?: string;
+  originalTimeSlot?: string;
+}): PushNotificationData {
+  const customerFullName = `${appointmentData.customerName} ${appointmentData.customerLastName}`.trim();
+  
+  return {
+    title: '📅 Cita Reprogramada',
+    body: `${customerFullName} ha reprogramado su cita para ${appointmentData.serviceName} ${appointmentData.appointmentDate}`,
+    data: {
+      type: 'barber_appointment_rescheduled',
+      customerName: customerFullName,
+      serviceName: appointmentData.serviceName,
+      appointmentDate: appointmentData.appointmentDate,
+      timeSlot: appointmentData.timeSlot,
+      customerPhone: appointmentData.customerPhone,
+      paymentAmount: appointmentData.paymentAmount,
+      originalDate: appointmentData.originalDate,
+      originalTimeSlot: appointmentData.originalTimeSlot
+    },
+    sound: 'default',
+    badge: 1,
+    channelId: 'barber_notifications'
+  };
+}
+
+/**
  * Test function to send a push notification immediately
  */
 export async function testPushNotification(expoPushToken: string, message: string): Promise<PushNotificationResult> {
@@ -283,4 +398,3 @@ export async function testPushNotification(expoPushToken: string, message: strin
 
   return await sendPushNotification(expoPushToken, notification);
 }
-

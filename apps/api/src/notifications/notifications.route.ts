@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
-import { sendAppointmentConfirmation, sendAppointmentReminder, checkAndSendReminders, testWhatsAppMessage, sendBarberNotification } from './notifications.controller.js';
-import { sendWhatsappReminder } from '../helpers/whatsapp.helper.js';
+import { sendAppointmentConfirmation, sendAppointmentReminder, checkAndSendReminders, sendBarberNotification } from './notifications.controller.js';
 import { successResponse, errorResponse } from '../helpers/response.helper.js';
-import { testWhatsAppConnection } from '../helpers/whatsapp.helper.js';
+import { sendPushNotification, generateBarberNotificationPushNotification } from '../helpers/expo-push.helper.js';
 import { formatPhoneForTwilio } from '../helpers/phone.helper.js';
 import cronService from '../services/cron.service.js';
 import { getDatabase } from '../db/connection.js';
@@ -13,12 +12,13 @@ const notificationsRoute = new Hono();
 // Test WhatsApp connection
 notificationsRoute.get('/test-connection', async (c) => {
   try {
-    const result = await testWhatsAppConnection();
+    // WhatsApp connection test removed - service deprecated
+    const result = { success: false, error: 'WhatsApp service deprecated' };
     
     if (result.success) {
       return c.json(successResponse(200, {
         message: 'WhatsApp connection successful',
-        details: 'Twilio credentials are valid and connection is working'
+        details: 'WhatsApp service deprecated'
       }));
     } else {
       return c.json(errorResponse(500, 'WhatsApp connection failed', result.error), 500);
@@ -39,13 +39,14 @@ notificationsRoute.post('/test-message', async (c) => {
       return c.json(errorResponse(400, 'Missing phoneNumber or message'), 400);
     }
     
-    // Format phone number for Twilio compatibility
+    // Format phone number
     const phoneResult = formatPhoneForTwilio(phoneNumber);
     if (!phoneResult.isValid) {
       return c.json(errorResponse(400, phoneResult.error || 'Invalid phone number format'), 400);
     }
     
-    const result = await testWhatsAppMessage(phoneResult.formatted, message);
+    // WhatsApp test message removed - service deprecated
+    const result = { success: false, error: 'WhatsApp service deprecated' };
     
     if (result.success) {
       return c.json(successResponse(200, {
@@ -277,7 +278,8 @@ notificationsRoute.post('/barber-simple-test', async (c) => {
 _The Royal Barber_`;
 
     // Send test message directly
-    const result = await sendWhatsappReminder('+1234567890', testMessage);
+    // WhatsApp reminder removed - service deprecated
+    const result = { success: false, error: 'WhatsApp service deprecated' };
     
     if (result.success) {
       return c.json(successResponse(200, {
@@ -363,18 +365,56 @@ notificationsRoute.post('/barber-test-no-payment', async (c) => {
   }
 });
 
+// Test barber push notification with Expo push token
+notificationsRoute.post('/barber-push-test', async (c) => {
+  try {
+    const { expoPushToken } = await c.req.json();
+    
+    if (!expoPushToken) {
+      return c.json(errorResponse(400, 'Expo push token is required'), 400);
+    }
+
+    // Test the barber notification with a simple message
+    const testNotification = generateBarberNotificationPushNotification({
+      customerName: 'Test',
+      customerLastName: 'Customer',
+      serviceName: 'Classic Haircut',
+      appointmentDate: '25 de enero de 2025 a las 10:00 AM',
+      timeSlot: '10:00',
+      customerPhone: '+1234567890',
+      paymentAmount: '25.00'
+    });
+
+    // Send test push notification
+    const result = await sendPushNotification(expoPushToken, testNotification);
+    
+    if (result.success) {
+      return c.json(successResponse(200, {
+        message: 'Barber push notification test completed successfully',
+        messageId: result.messageId,
+        ticketId: result.ticketId
+      }));
+    } else {
+      return c.json(errorResponse(400, 'Failed to send barber push notification', result.error), 400);
+    }
+  } catch (error) {
+    return c.json(errorResponse(500, 'Internal server error', error), 500);
+  }
+});
+
 // Health check for notifications system
 notificationsRoute.get('/health', async (c) => {
   try {
-    const connectionTest = await testWhatsAppConnection();
+    // WhatsApp connection test removed - service deprecated
+    const connectionTest = { success: false, error: 'WhatsApp service deprecated' };
     const cronStatus = cronService.getStatus();
     
     return c.json(successResponse(200, {
-      service: 'WhatsApp Notifications',
-      status: connectionTest.success ? 'healthy' : 'unhealthy',
+      service: 'Push Notifications',
+      status: 'healthy',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
+      whatsappDeprecated: true,
       cronJob: {
         isRunning: cronStatus.isRunning,
         schedule: cronStatus.schedule,
